@@ -1,0 +1,9 @@
+repos:
+  - repo: local
+    hooks:
+      - id: rye-check-all
+        name: rye check-all
+        entry: rye run check-all
+        language: system
+        types: [python]
+        pass_filenames: false

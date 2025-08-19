@@ -1,0 +1,51 @@
+version: "3.8"
+
+services:
+
+  router-service:
+    build:
+      context: ../
+      dockerfile: deployment/Dockerfile
+    depends_on:
+      - database
+    container_name: router_service
+    environment:
+      - DIGITALSEC__EXTERNAL__POSTGRES__HOST=database
+
+  database:
+    image: pgvector/pgvector:pg17
+    container_name: database
+    restart: on-failure
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres -h database" ]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+    environment:
+      - POSTGRES_USER=digitalsec_username
+      - POSTGRES_PASSWORD=digitalsec_password
+      - POSTGRES_DB=digitalsec
+    volumes:
+      - database_data:/var/lib/postgresql/data
+      - ./init-scripts:/docker-entrypoint-initdb.d
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7
+    container_name: redis
+    ports:
+      - "6379:6379"
+    command: >
+      redis-server
+      --requirepass digitalsec_password
+      --appendonly yes
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+
+volumes:
+  database_data:
+    driver: local
+  redis_data:
+    driver: local

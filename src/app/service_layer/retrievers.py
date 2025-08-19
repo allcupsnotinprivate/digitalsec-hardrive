@@ -1,0 +1,137 @@
+import abc
+import statistics
+from collections import defaultdict
+from typing import Literal, Sequence
+from uuid import UUID
+
+import orjson
+from loguru import logger
+
+from app.infrastructure import ARedisClient, ATextVectorizer
+from app.models import Document
+from app.utils.hash import create_md5_hash
+
+from .aClasses import AService
+from .uow import AUnitOfWork
+
+
+class ARetrieverService(AService, abc.ABC):
+    @abc.abstractmethod
+    async def retrieve_documents(
+        self,
+        definition: str,
+        sender_id: UUID | None,
+        limit: int,
+        *,
+        distance_metric: Literal["cosine", "l2", "inner"] = "cosine",
+        aggregation_method: Literal["mean", "max", "top_k_mean"] = "mean",
+        soft_limit_multiplier: float = 3.0,
+    ) -> Sequence[tuple[Document, float]]:
+        raise NotImplementedError
+
+
+class RetrieverService(ARetrieverService):
+    def __init__(self, cache_ttl: int, uow: AUnitOfWork, vectorizer: ATextVectorizer, redis: ARedisClient):
+        self.cache_ttl = cache_ttl
+        self.uow = uow
+        self.vectorizer = vectorizer
+        self.redis = redis
+
+    # TODO: Implement soft-limit - take more chunks than `limit` to better aggregate by document_id, and after aggregation trim by limit.
+    # TODO: Add weighted aggregation - take into account chunk positions, sizes or chunk weights when aggregating.
+    # TODO: Add `score_threshold` parameter to discard irrelevant documents immediately by threshold.
+    async def retrieve_documents(
+        self,
+        definition: str,
+        sender_id: UUID | None,
+        limit: int,
+        *,
+        distance_metric: Literal["cosine", "l2", "inner"] = "cosine",
+        aggregation_method: Literal["mean", "max", "top_k_mean"] = "max",
+        soft_limit_multiplier: float = 3.0,
+    ) -> Sequence[tuple[Document, float]]:
+        logger.debug(
+            "Retriever query",
+            definition_length=len(definition) if definition else "N/A",
+            sender_id=sender_id,
+            limit=limit,
+            distance_metric=distance_metric,
+            aggregation_method=aggregation_method,
+        )
+
+        definition_embedding = await self._vectorize(definition)
+        async with self.uow as uow_ctx:
+            soft_limit = int(limit * soft_limit_multiplier)
+            relevant_chunks = await uow_ctx.document_chunks.get_relevant_chunks(
+                embedding=definition_embedding, limit=soft_limit, distance_metric="cosine", sender_id=sender_id
+            )
+
+            logger.debug("Found relevant chunks", chunks_count=len(relevant_chunks))
+
+            doc_scores: dict[UUID, list[float]] = defaultdict(list)
+            for chunk, score in relevant_chunks:
+                doc_scores[chunk.document_id].append(score)
+
+            doc_id_with_score: list[tuple[UUID, float]] = [
+                (doc_id, self._aggregate_scores(scores, method=aggregation_method))
+                for doc_id, scores in doc_scores.items()
+            ]
+
+            doc_id_with_score.sort(key=lambda tup: tup[1], reverse=True)
+
+            sorted_doc_ids = [doc_id for doc_id, _ in doc_id_with_score]
+            documents = await uow_ctx.documents.get_by_ids(sorted_doc_ids)
+            doc_by_id = {doc.id: doc for doc in documents if doc is not None}
+
+            logger.debug("Aggregated documents", documnets_count=len(doc_id_with_score))
+
+            final_result: list[tuple[Document, float]] = []
+            for doc_id, score in doc_id_with_score[:limit]:
+                doc = doc_by_id.get(doc_id)
+                if doc:
+                    final_result.append((doc, score))
+
+            logger.debug("Returning documents", documents_count=len(final_result))
+
+            # statistic logs
+            if not final_result:
+                logger.warning("No documents retrieved")
+            else:
+                scores = [score for _, score in final_result]
+                chunk_scores = [score for _, score in relevant_chunks]
+                logger.info(
+                    "Retrieval statistics",
+                    document_min_score=f"{min(scores):.4f}",
+                    document_max_score=f"{max(scores):.4f}",
+                    document_mean_score=f"{statistics.mean(scores):.4f}",
+                    chunk_min_score=f"{min(chunk_scores):.4f}",
+                    chunk_max_score=f"max={max(chunk_scores):.4f}",
+                    chunk_mean_score=f"{statistics.mean(chunk_scores):.4f}",
+                )
+
+            return final_result
+
+    @staticmethod
+    def _aggregate_scores(scores: list[float], method: Literal["mean", "max", "top_k_mean"], k: int = 3) -> float:
+        if method == "mean":
+            return statistics.mean(scores)
+        if method == "max":
+            return max(scores)
+        if method == "top_k_mean":
+            top_scores = sorted(scores, reverse=True)[:k]
+            return statistics.mean(top_scores)
+        raise ValueError(f"Unknown aggregation method: {method}")
+
+    async def _vectorize(self, text: str) -> list[float]:
+        text_hash = str(create_md5_hash(text, as_bytes=False))
+        cache_key = f"retriever:embeddings:{text_hash}"
+
+        cached = await self.redis.get(cache_key)
+        if cached:
+            embedding = orjson.loads(cached)
+            if isinstance(embedding, list):
+                return embedding
+
+        embedding = await self.vectorizer.vectorize(text)
+        await self.redis.set(cache_key, orjson.dumps(embedding), ex=self.cache_ttl)
+        return embedding

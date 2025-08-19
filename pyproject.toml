@@ -1,0 +1,96 @@
+[project]
+name = "backend-digitalsec"
+version = "0.1.0"
+description = "Add your description here"
+authors = [
+    { name = "denis.alekseev", email = "den-200171@yandex.ru" }
+]
+dependencies = [
+    "fastapi>=0.115.12",
+    "pydantic>=2.11.5",
+    "pydantic-settings>=2.9.1",
+    "aioinject==0.38.1",
+    "uvicorn>=0.34.3",
+    "sqlalchemy>2",
+    "alembic>=1.16.1",
+    "greenlet>=3.2.2",
+    "tenacity>=9.1.2",
+    "loguru>=0.7.3",
+    "pytz>=2025.2",
+    "litellm==1.65.1",
+    "neo4j>=5.28.1",
+    "nltk>=3.9.1",
+    "numpy>=2.2.6",
+    "scikit-learn>=1.6.1",
+    "jinja2>=3.1.6",
+    "pgvector>=0.4.1",
+    "psycopg>=3.2.9",
+    "apscheduler>=3.11.0",
+    "httpx>=0.28.1",
+    "redis[async]>=6.2.0",
+    "orjson>=3.11.1",
+]
+readme = "README.md"
+requires-python = ">= 3.12"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.rye]
+managed = true
+dev-dependencies = [
+    "ruff>=0.11.12",
+    "pytest>=8.3.5",
+    "pytest-asyncio>=1.0.0",
+    "faker>=37.3.0",
+    "pytest-cov>=6.1.1",
+    "mypy>=1.16.0",
+    "pandas>=2.2.3",
+    "python-docx>=1.1.2",
+    "six>=1.17.0",
+    "bandit>=1.8.3",
+    "typer>=0.16.0",
+    "types-pytz>=2025.2.0.20250516",
+]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/app"]
+
+[tool.ruff]
+line-length = 120
+indent-width = 4
+fix = true
+output-format = "grouped"
+
+[tool.ruff.format]
+quote-style = "double"
+docstring-code-format = true
+
+[tool.ruff.lint]
+ignore = ["F841", "E722", "E712"]
+extend-select = ["I"]
+extend-unsafe-fixes = ["E", "F401"]
+
+[tool.mypy]
+python_version = "3.12"
+plugins = [
+    "pydantic.mypy",
+    "sqlalchemy.ext.mypy.plugin"
+]
+strict = true
+mypy_path = "src"
+ignore_missing_imports = true
+
+[tool.bandit]
+skips = ["B104"]
+
+[tool.rye.scripts]
+migrations = { cmd = ["python", "src/app/infrastructure/database/migrations/cli.py"], env-file = ".dev.env" }
+asgi = { cmd = ["python", "src/app/main.py"], env-file = ".dev.env" }
+typecheck = { cmd = ["mypy", "src/"] }
+security-check = { cmd = ["sh", "-c", "bandit -c pyproject.toml -r src/"] }
+check-all = { cmd = ["sh", "-c", "ruff format src/ && ruff check src/ && mypy src/ && bandit -c pyproject.toml -r src/"] }
