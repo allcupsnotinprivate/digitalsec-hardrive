@@ -2,6 +2,7 @@ import abc
 
 import litellm
 import tenacity
+from loguru import logger
 
 from .aClasses import AInfrastructure
 
@@ -18,6 +19,7 @@ class TextVectorizer(ATextVectorizer):
 
     async def vectorize(self, text: str) -> list[float]:
         embedding = await self._get_llm_estimation(text)
+        logger.debug("Embedding built", embedding_dim=len(embedding), text_size=len(text))
         return embedding
 
     @tenacity.retry(

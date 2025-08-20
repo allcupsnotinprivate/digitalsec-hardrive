@@ -26,8 +26,10 @@ class RoutesRepository(ARoutesRepository):
         stmt_update = update(self.model_class).where(self.model_class.id == route_id).values(status=status)
 
         if status == ProcessStatus.IN_PROGRESS:
-            stmt_update = stmt_update.values(started_at=now_with_tz())
-        elif status in (status.FAILED, status.COMPLETED):
+            stmt_update = stmt_update.values(started_at=now_with_tz(), completed_at=None)
+        elif status == ProcessStatus.PENDING:
+            stmt_update = stmt_update.values(started_at=None, completed_at=None)
+        elif status in (status.FAILED, status.COMPLETED, status.TIMEOUT):
             stmt_update = stmt_update.values(completed_at=now_with_tz())
 
         stmt_update = stmt_update.execution_options(synchronize_session="fetch")

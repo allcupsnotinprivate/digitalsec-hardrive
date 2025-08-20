@@ -6,7 +6,7 @@ from app.logs import LogLevel
 
 
 class SegmenterSettings(BaseModel):
-    max_chunk_size: int = Field(default=480)
+    max_chunk_size: int = Field(default=1800)
     min_chunk_size: int = Field(default=100)
     similarity_threshold: float = Field(default=0.5)
     language: Literal["russian"] = Field(default="russian")
@@ -17,8 +17,9 @@ class RetrieverSettings(BaseModel):
 
 
 class RouterSettings(BaseModel):
-    retriever_limit: int = Field(default=10)
-    retriever_soft_limit_multiplier: float = Field(default=3.0)
+    retriever_limit: int = Field(default=20)
+    retriever_soft_limit_multiplier: float = Field(default=5.0)
+    investigation_timeout: float = Field(default=300, gt=5)
 
 
 class LogsSettings(BaseModel):

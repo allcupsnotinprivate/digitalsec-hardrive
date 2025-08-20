@@ -20,6 +20,8 @@ aiosignal==1.3.2
     # via aiohttp
 alembic==1.16.1
     # via backend-digitalsec
+amqp==5.3.1
+    # via kombu
 annotated-types==0.7.0
     # via pydantic
 anyio==4.9.0
@@ -33,6 +35,11 @@ attrs==25.3.0
     # via jsonschema
     # via referencing
 bandit==1.8.3
+billiard==4.2.1
+    # via celery
+celery==5.3.1
+    # via backend-digitalsec
+celery-types==0.23.0
 certifi==2025.4.26
     # via httpcore
     # via httpx
@@ -40,10 +47,20 @@ certifi==2025.4.26
 charset-normalizer==3.4.2
     # via requests
 click==8.2.1
+    # via celery
+    # via click-didyoumean
+    # via click-plugins
+    # via click-repl
     # via litellm
     # via nltk
     # via typer
     # via uvicorn
+click-didyoumean==0.3.1
+    # via celery
+click-plugins==1.1.1.2
+    # via celery
+click-repl==0.3.0
+    # via celery
 coverage==7.8.2
     # via pytest-cov
 distro==1.9.0
@@ -94,6 +111,8 @@ jsonschema==4.24.0
     # via litellm
 jsonschema-specifications==2025.4.1
     # via jsonschema
+kombu==5.5.4
+    # via celery
 litellm==1.65.1
     # via backend-digitalsec
 loguru==0.7.3
@@ -131,6 +150,7 @@ orjson==3.11.1
     # via backend-digitalsec
 packaging==25.0
     # via huggingface-hub
+    # via kombu
     # via pytest
 pandas==2.2.3
 pathspec==0.12.1
@@ -141,6 +161,8 @@ pgvector==0.4.1
     # via backend-digitalsec
 pluggy==1.6.0
     # via pytest
+prompt-toolkit==3.0.51
+    # via click-repl
 propcache==0.3.1
     # via aiohttp
     # via yarl
@@ -164,6 +186,7 @@ pytest==8.3.5
 pytest-asyncio==1.0.0
 pytest-cov==6.1.1
 python-dateutil==2.9.0.post0
+    # via celery
     # via pandas
 python-docx==1.1.2
 python-dotenv==1.1.0
@@ -178,6 +201,7 @@ pyyaml==6.0.2
     # via huggingface-hub
 redis==6.2.0
     # via backend-digitalsec
+    # via celery
 referencing==0.36.2
     # via jsonschema
     # via jsonschema-specifications
@@ -232,6 +256,7 @@ typing-extensions==4.14.0
     # via aioinject
     # via alembic
     # via anyio
+    # via celery-types
     # via fastapi
     # via huggingface-hub
     # via mypy
@@ -248,7 +273,9 @@ typing-inspection==0.4.1
     # via pydantic
     # via pydantic-settings
 tzdata==2025.2
+    # via celery
     # via faker
+    # via kombu
     # via pandas
 tzlocal==5.3.1
     # via apscheduler
@@ -256,6 +283,12 @@ urllib3==2.4.0
     # via requests
 uvicorn==0.34.3
     # via backend-digitalsec
+vine==5.1.0
+    # via amqp
+    # via celery
+    # via kombu
+wcwidth==0.2.13
+    # via prompt-toolkit
 yarl==1.20.0
     # via aiohttp
 zipp==3.22.0

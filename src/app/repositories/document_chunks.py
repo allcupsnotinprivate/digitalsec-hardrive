@@ -4,8 +4,7 @@ from uuid import UUID
 
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased
-from sqlalchemy.sql.expression import asc
+from sqlalchemy.sql.expression import and_, asc, exists
 
 from app.models import DocumentChunk, Forwarded
 from app.repositories import ARepository
@@ -57,17 +56,16 @@ class DocumentChunksRepository(ADocumentChunksRepository):
         else:
             raise ValueError(f"Unsupported distance metric: {distance_metric}")
 
-        stmt = (
-            select(DocumentChunk, distance_func.label("score"))
-            .distinct(DocumentChunk.id)
-            .order_by(DocumentChunk.id, order_direction(distance_func))
+        stmt = select(
+            DocumentChunk,
+            distance_func.label("cosine_distance"),
         )
 
         if sender_id:
-            forwarded_alias = aliased(Forwarded)
-            stmt = stmt.join(forwarded_alias, forwarded_alias.document_id == DocumentChunk.document_id).filter(  # noqa
-                forwarded_alias.sender_id == sender_id
+            forwarded_subquery = exists().where(
+                and_(Forwarded.document_id == DocumentChunk.document_id, Forwarded.sender_id == sender_id)
             )
+            stmt = stmt.where(forwarded_subquery)
 
         if chunk_score_threshold is not None:
             if distance_metric == "inner":

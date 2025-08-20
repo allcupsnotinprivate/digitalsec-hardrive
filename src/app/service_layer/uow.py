@@ -12,6 +12,8 @@ from app.infrastructure import APostgresDatabase
 
 
 class AUnitOfWorkContext(abc.ABC):
+    session: AsyncSession
+
     agents: repositories.A_AgentsRepository
     document_chunks: repositories.ADocumentChunksRepository
     documents: repositories.ADocumentsRepository

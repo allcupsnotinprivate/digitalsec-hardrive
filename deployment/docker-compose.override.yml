@@ -8,14 +8,73 @@ services:
       dockerfile: deployment/Dockerfile
     depends_on:
       - database
+      - redis
     container_name: router_service
+    restart: on-failure
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 512M
     environment:
       - DIGITALSEC__EXTERNAL__POSTGRES__HOST=database
+      - DIGITALSEC__EXTERNAL__REDIS__HOST=redis
+
+  celery-worker:
+    build:
+      context: ../
+      dockerfile: deployment/Dockerfile
+    depends_on:
+      - database
+      - redis
+    container_name: celery_worker
+    restart: on-failure
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+    command: >
+      bash -lc "
+      celery -A app.worker.celery_app worker
+        --loglevel=info
+        --concurrency=2
+        --prefetch-multiplier=1
+        --max-tasks-per-child=100
+      "
+    environment:
+      - DIGITALSEC__EXTERNAL__POSTGRES__HOST=database
+      - DIGITALSEC__EXTERNAL__REDIS__HOST=redis
+
+  celery-beat:
+    build:
+      context: ../
+      dockerfile: deployment/Dockerfile
+    depends_on:
+      - database
+      - redis
+    container_name: celery_beat
+    restart: on-failure
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+    command: celery -A app.worker.celery_app beat --loglevel=info
+    environment:
+      - DIGITALSEC__EXTERNAL__POSTGRES__HOST=database
+      - DIGITALSEC__EXTERNAL__REDIS__HOST=redis
 
   database:
     image: pgvector/pgvector:pg17
     container_name: database
     restart: on-failure
+    shm_size: "1g"
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 2G
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U postgres -h database" ]
       interval: 3s
@@ -36,6 +95,12 @@ services:
     container_name: redis
     ports:
       - "6379:6379"
+    restart: on-failure
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
     command: >
       redis-server
       --requirepass digitalsec_password

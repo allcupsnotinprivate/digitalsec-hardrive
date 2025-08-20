@@ -20,6 +20,7 @@ class RouteDocumentOut(BaseAPISchema):
 
 class RouteInvestigationIn(BaseAPISchema):
     sender_id: UUID | None = Field(default=None)
+    allow_recovery: bool = Field(default=False)
 
 
 class ForwardedOut(BaseAPISchema):

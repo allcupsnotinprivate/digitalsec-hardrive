@@ -50,14 +50,14 @@ class SemanticTextSegmenter(ATextSegmenter):
         embeddings = []
         for sentence in sentences:
             if not sentence.strip():
-                embeddings.append(np.zeros(1536))
+                embeddings.append(np.zeros(1024))
                 continue
 
             try:
                 embedding = await self.vectorizer.vectorize(sentence)
                 embeddings.append(embedding)  # type: ignore[arg-type]
             except (Exception,):
-                embeddings.append(np.zeros(1536))
+                embeddings.append(np.zeros(1024))
 
         try:
             similarity_matrix: np.ndarray[Any, Any] = cosine_similarity(embeddings)

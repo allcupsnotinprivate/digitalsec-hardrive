@@ -8,7 +8,7 @@ import orjson
 from loguru import logger
 
 from app.infrastructure import ARedisClient, ATextVectorizer
-from app.models import Document
+from app.models import Document, DocumentChunk
 from app.utils.hash import create_md5_hash
 
 from .aClasses import AService
@@ -17,9 +17,9 @@ from .uow import AUnitOfWork
 
 class ARetrieverService(AService, abc.ABC):
     @abc.abstractmethod
-    async def retrieve_documents(
+    async def retrieve_documents_by_similar_document(
         self,
-        definition: str,
+        document_id: UUID,
         sender_id: UUID | None,
         limit: int,
         *,
@@ -40,9 +40,9 @@ class RetrieverService(ARetrieverService):
     # TODO: Implement soft-limit - take more chunks than `limit` to better aggregate by document_id, and after aggregation trim by limit.
     # TODO: Add weighted aggregation - take into account chunk positions, sizes or chunk weights when aggregating.
     # TODO: Add `score_threshold` parameter to discard irrelevant documents immediately by threshold.
-    async def retrieve_documents(
+    async def retrieve_documents_by_similar_document(
         self,
-        definition: str,
+        document_id: UUID,
         sender_id: UUID | None,
         limit: int,
         *,
@@ -52,19 +52,23 @@ class RetrieverService(ARetrieverService):
     ) -> Sequence[tuple[Document, float]]:
         logger.debug(
             "Retriever query",
-            definition_length=len(definition) if definition else "N/A",
+            definition_type="Query" if isinstance(document_id, str) else "Document ID",
             sender_id=sender_id,
             limit=limit,
             distance_metric=distance_metric,
             aggregation_method=aggregation_method,
         )
 
-        definition_embedding = await self._vectorize(definition)
         async with self.uow as uow_ctx:
             soft_limit = int(limit * soft_limit_multiplier)
-            relevant_chunks = await uow_ctx.document_chunks.get_relevant_chunks(
-                embedding=definition_embedding, limit=soft_limit, distance_metric="cosine", sender_id=sender_id
-            )
+
+            document_chunks = await uow_ctx.document_chunks.get_document_chunks(document_id=document_id)
+            relevant_chunks: list[tuple[DocumentChunk, float]] = list()
+            for chunk in document_chunks:
+                document_relevant_chunks = await uow_ctx.document_chunks.get_relevant_chunks(
+                    embedding=chunk.embedding, limit=soft_limit, distance_metric=distance_metric, sender_id=sender_id
+                )
+                relevant_chunks.extend(document_relevant_chunks)
 
             logger.debug("Found relevant chunks", chunks_count=len(relevant_chunks))
 

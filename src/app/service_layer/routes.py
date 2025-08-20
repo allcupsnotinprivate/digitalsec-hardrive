@@ -6,7 +6,7 @@ from loguru import logger
 
 from app.exceptions import BusinessLogicError, NotFoundError, OperationNotAllowedError
 from app.infrastructure import ATextSummarizer
-from app.models import DocumentMetaPrototype, Forwarded, PotentialRecipient, ProcessStatus, Route, SimilarDocumentSource
+from app.models import Forwarded, PotentialRecipient, ProcessStatus, Route, SimilarDocumentSource
 
 from .aClasses import AService
 from .agents import A_AgentsService
@@ -72,7 +72,11 @@ class RoutesService(ARoutesService):
         route = await self.retrieve(id)
 
         if route.status != ProcessStatus.PENDING:
-            raise OperationNotAllowedError(f"Route investigation completed with status {route.status.value}")
+            if allow_recovery and route.status in (ProcessStatus.FAILED, ProcessStatus.TIMEOUT):
+                async with self.uow as uow_ctx:
+                    route = await uow_ctx.routes.update_status(id, ProcessStatus.PENDING)
+            else:
+                raise OperationNotAllowedError(f"Route investigation completed with status {route.status.value}")
 
         async with self.uow as uow_ctx:
             route = await uow_ctx.routes.update_status(id, ProcessStatus.IN_PROGRESS)
@@ -80,34 +84,8 @@ class RoutesService(ARoutesService):
         try:
             # ----- Retrieve Similar Documents ------
 
-            async with self.uow as uow_ctx:
-                logger.debug("Trying to get document meta prototype", document_id=route.document_id)
-                await uow_ctx.lock_advisory(route.document_id)  # lock
-
-                # TODO: need to add decay of summation over time
-                document_meta_prototype = await uow_ctx.document_meta_prototypes.get_last(document_id=route.document_id)
-                if not document_meta_prototype or not document_meta_prototype.summary:
-                    document_content = await self.documents_service.extract_document_content(
-                        document_id=route.document_id
-                    )
-                    document_summary = await self.summarizer.summarize(document_content)
-                    # Save actual meta prototype
-                    new_document_meta_prototype = DocumentMetaPrototype(
-                        document_id=route.document_id, summary=document_summary
-                    )
-                    await uow_ctx.document_meta_prototypes.add(new_document_meta_prototype)
-                    await uow_ctx.commit()
-                else:
-                    logger.debug(
-                        "Use prepared summary in document meta prototype",
-                        document_id=route.document_id,
-                        meta_prototype_id=document_meta_prototype.id,
-                        created_at=document_meta_prototype.created_at,
-                    )
-                    document_summary = document_meta_prototype.summary
-
-            similar_documents = await self.retriever.retrieve_documents(
-                definition=document_summary,
+            similar_documents = await self.retriever.retrieve_documents_by_similar_document(
+                document_id=route.document_id,
                 limit=self.retriever_limit,
                 sender_id=sender_id,
                 soft_limit_multiplier=self.retriever_soft_limit_multiplier,

@@ -19,7 +19,7 @@ branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 ProcessStatusEnum = postgresql.ENUM(
-    "PENDING", "IN_PROGRESS", "COMPLETED", "FAILED", name="process_status", create_type=False
+    "PENDING", "IN_PROGRESS", "COMPLETED", "TIMEOUT", "FAILED", name="process_status", create_type=False
 )
 
 

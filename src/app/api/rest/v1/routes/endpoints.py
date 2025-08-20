@@ -1,4 +1,3 @@
-import asyncio
 from uuid import UUID
 
 from aioinject import Injected
@@ -6,6 +5,7 @@ from aioinject.ext.fastapi import inject
 from fastapi import APIRouter, Body, Depends, Query
 
 from app.service_layer import ARoutesService
+from app.tasks.routes import investigate_route
 
 from .schemas import ForwardedOut, RouteDocumentIn, RouteDocumentOut, RouteInvestigationIn, RouteInvestigationOut
 
@@ -32,17 +32,17 @@ async def retrieve_route(id: UUID = Query(), routes_service: Injected[ARoutesSer
     )
 
 
-@router.post("/investigate", status_code=204)
+@router.post("/investigate", status_code=202)
 @inject
 async def investigate_routing(
     route_id: UUID = Query(alias="routeId"),
     data: RouteInvestigationIn = Body(),
-    routes_service: Injected[ARoutesService] = Depends(),
 ) -> None:
-    async def do_investigation() -> None:
-        await routes_service.investigate(id=route_id, sender_id=data.sender_id)
-
-    asyncio.create_task(do_investigation())
+    investigate_route.delay(
+        str(route_id),
+        str(data.sender_id) if data.sender_id else None,
+        allow_recovery=data.allow_recovery,
+    )
 
 
 @router.get("/investigations/forwards/fetch", status_code=200, response_model=RouteInvestigationOut)
