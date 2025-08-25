@@ -21,6 +21,8 @@ class ADocumentChunksRepository(ARepository[DocumentChunk, UUID], abc.ABC):
         limit: int,
         distance_metric: Literal["cosine", "l2", "inner"],
         sender_id: UUID | None = None,
+        is_valid: bool | None = None,
+        is_hidden: bool | None = None,
         chunk_score_threshold: float | None = None,
     ) -> Sequence[tuple[DocumentChunk, float]]:
         raise NotImplementedError
@@ -40,6 +42,8 @@ class DocumentChunksRepository(ADocumentChunksRepository):
         limit: int = 10,
         distance_metric: Literal["cosine", "l2", "inner"] = "cosine",
         sender_id: UUID | None = None,
+        is_valid: bool | None = None,
+        is_hidden: bool | None = None,
         chunk_score_threshold: float | None = None,
     ) -> Sequence[tuple[DocumentChunk, float]]:
         vector = embedding
@@ -61,10 +65,16 @@ class DocumentChunksRepository(ADocumentChunksRepository):
             distance_func.label("cosine_distance"),
         )
 
-        if sender_id:
-            forwarded_subquery = exists().where(
-                and_(Forwarded.document_id == DocumentChunk.document_id, Forwarded.sender_id == sender_id)
-            )
+        if sender_id is not None or is_valid is not None or is_hidden is not None:
+            forwarded_filters = [Forwarded.document_id == DocumentChunk.document_id]
+            if sender_id is not None:
+                forwarded_filters.append(Forwarded.sender_id == sender_id)
+            if is_valid is not None:
+                forwarded_filters.append(Forwarded.is_valid.is_(is_valid))
+            if is_hidden is not None:
+                forwarded_filters.append(Forwarded.is_hidden.is_(is_hidden))
+
+            forwarded_subquery = exists().where(and_(*forwarded_filters))
             stmt = stmt.where(forwarded_subquery)
 
         if chunk_score_threshold is not None:

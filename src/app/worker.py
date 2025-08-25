@@ -2,6 +2,7 @@ from celery import Celery
 
 from app.configs import Settings
 from app.container import container
+from app.logs import configure_logger
 
 
 def create_celery_app() -> Celery:
@@ -15,10 +16,13 @@ def create_celery_app() -> Celery:
         include=["app.tasks.routes"],
     )
 
+    configure_logger(enabled=settings.internal.log.enable, log_level=settings.internal.log.level)
+
     app.conf.update(
         task_soft_time_limit=settings.internal.router.investigation_timeout,
         task_time_limit=settings.internal.router.investigation_timeout + 60,
         worker_hijack_root_logger=False,
+        worker_redirect_stdouts=False,
     )
 
     app.conf.beat_schedule = {

@@ -1,5 +1,5 @@
 import abc
-from typing import Sequence
+from typing import Sequence, Literal
 from uuid import UUID
 
 from loguru import logger
@@ -39,6 +39,8 @@ class RoutesService(ARoutesService):
         retriever_limit: int,
         retriever_soft_limit_multiplier: float,
         retriever_score_threshold: float | None,
+        retriever_distance_metric: Literal["cosine", "l2", "inner"],
+        retriever_aggregation_method: Literal["mean", "max", "top_k_mean"],
         uow: AUnitOfWork,
         summarizer: ATextSummarizer,
         retriever: ARetrieverService,
@@ -48,6 +50,8 @@ class RoutesService(ARoutesService):
         self.retriever_limit = retriever_limit
         self.retriever_soft_limit_multiplier = retriever_soft_limit_multiplier
         self.retriever_score_threshold = retriever_score_threshold
+        self.retriever_distance_metric = retriever_distance_metric
+        self.retriever_aggregation_method = retriever_aggregation_method
         self.uow = uow
         self.retriever = retriever
         self.documents_service = documents_service
@@ -92,6 +96,8 @@ class RoutesService(ARoutesService):
                 sender_id=sender_id,
                 soft_limit_multiplier=self.retriever_soft_limit_multiplier,
                 score_threshold=self.retriever_score_threshold,
+                distance_metric=self.retriever_distance_metric,
+                aggregation_method=self.retriever_aggregation_method,
             )
 
             if not similar_documents:

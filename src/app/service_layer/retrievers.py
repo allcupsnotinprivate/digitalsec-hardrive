@@ -69,15 +69,20 @@ class RetrieverService(ARetrieverService):
             relevant_chunks: list[tuple[DocumentChunk, float]] = list()
             for chunk in document_chunks:
                 document_relevant_chunks = await uow_ctx.document_chunks.get_relevant_chunks(
-                    embedding=chunk.embedding, limit=soft_limit, distance_metric=distance_metric, sender_id=sender_id
+                    embedding=chunk.embedding,
+                    limit=soft_limit,
+                    distance_metric=distance_metric,
+                    sender_id=sender_id,
+                    is_valid=True,
+                    is_hidden=False
                 )
                 for candidate_chunk, chunk_score in document_relevant_chunks:
                     if distance_metric == "inner":
-                        rerank_score = self._text_similarity(chunk.content, candidate_chunk.content)
-                        combined_score = (chunk_score + rerank_score) / 2
+                        chunk_similarity = chunk_score
                     else:
-                        rerank_distance = 1 - self._text_similarity(chunk.content, candidate_chunk.content)
-                        combined_score = (chunk_score + rerank_distance) / 2
+                        chunk_similarity = 1 / (1 + chunk_score)
+                    rerank_similarity = self._text_similarity(chunk.content, candidate_chunk.content)
+                    combined_score = (chunk_similarity + rerank_similarity) / 2
                     relevant_chunks.append((candidate_chunk, combined_score))
 
             logger.debug("Found relevant chunks", chunks_count=len(relevant_chunks))
@@ -89,29 +94,17 @@ class RetrieverService(ARetrieverService):
 
             doc_id_with_score: list[tuple[UUID, float]] = []
             for doc_id, score_weight_pairs in doc_scores.items():
-                aggregated = self._aggregate_scores(
-                    score_weight_pairs, method=aggregation_method, distance_metric=distance_metric
-                )
+                aggregated = self._aggregate_scores(score_weight_pairs, method=aggregation_method)
                 logger.debug(
                     "Aggregated score has been obtained",
                     score=aggregated,
                     score_threshold=score_threshold,
                     distance_metric=distance_metric,
                 )
-                if score_threshold is None:
+                if score_threshold is None or aggregated >= score_threshold:
                     doc_id_with_score.append((doc_id, aggregated))
-                else:
-                    if distance_metric == "inner":
-                        if aggregated >= score_threshold:
-                            doc_id_with_score.append((doc_id, aggregated))
-                    else:
-                        if aggregated <= score_threshold:
-                            doc_id_with_score.append((doc_id, aggregated))
 
-            if distance_metric == "inner":
-                doc_id_with_score.sort(key=lambda tup: tup[1], reverse=True)
-            else:
-                doc_id_with_score.sort(key=lambda tup: tup[1])
+            doc_id_with_score.sort(key=lambda tup: tup[1], reverse=True)
 
             sorted_doc_ids = [doc_id for doc_id, _ in doc_id_with_score]
             documents = await uow_ctx.documents.get_by_ids(sorted_doc_ids)
@@ -150,7 +143,6 @@ class RetrieverService(ARetrieverService):
         scores: list[tuple[float, float]],
         method: Literal["mean", "max", "top_k_mean"],
         *,
-        distance_metric: Literal["cosine", "l2", "inner"],
         k: int = 3,
     ) -> float:
         if method == "mean":
@@ -159,14 +151,9 @@ class RetrieverService(ARetrieverService):
                 return 0.0
             return sum(score * weight for score, weight in scores) / total_weight
         if method == "max":
-            if distance_metric == "inner":
-                return max(score for score, _ in scores)
-            return min(score for score, _ in scores)
+            return max(score for score, _ in scores)
         if method == "top_k_mean":
-            if distance_metric == "inner":
-                top_scores = sorted(scores, key=lambda s: s[0], reverse=True)[:k]
-            else:
-                top_scores = sorted(scores, key=lambda s: s[0])[:k]
+            top_scores = sorted(scores, key=lambda s: s[0], reverse=True)[:k]
             total_weight = sum(weight for _, weight in top_scores)
             if total_weight == 0:
                 return 0.0
