@@ -74,7 +74,8 @@ class RetrieverService(ARetrieverService):
                     distance_metric=distance_metric,
                     sender_id=sender_id,
                     is_valid=True,
-                    is_hidden=False
+                    is_hidden=False,
+                    exclude_document_ids=[document_id],
                 )
                 for candidate_chunk, chunk_score in document_relevant_chunks:
                     if distance_metric == "inner":
