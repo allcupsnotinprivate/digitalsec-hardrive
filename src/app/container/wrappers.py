@@ -70,6 +70,7 @@ class RoutesServiceWrapper(service_layer.RoutesService):
         super().__init__(
             retriever_limit=router.retriever_limit,
             retriever_soft_limit_multiplier=router.retriever_soft_limit_multiplier,
+            retriever_score_threshold=router.retriever_score_threshold,
             uow=uow,
             summarizer=summarizer,
             retriever=retriever,

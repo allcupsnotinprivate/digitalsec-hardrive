@@ -18,6 +18,7 @@ def create_celery_app() -> Celery:
     app.conf.update(
         task_soft_time_limit=settings.internal.router.investigation_timeout,
         task_time_limit=settings.internal.router.investigation_timeout + 60,
+        worker_hijack_root_logger=False,
     )
 
     app.conf.beat_schedule = {

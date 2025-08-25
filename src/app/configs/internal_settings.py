@@ -19,6 +19,7 @@ class RetrieverSettings(BaseModel):
 class RouterSettings(BaseModel):
     retriever_limit: int = Field(default=20)
     retriever_soft_limit_multiplier: float = Field(default=5.0)
+    retriever_score_threshold: float | None = Field(default=None, ge=0.0)
     investigation_timeout: float = Field(default=300, gt=5)
 
 

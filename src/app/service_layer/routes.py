@@ -38,6 +38,7 @@ class RoutesService(ARoutesService):
         self,
         retriever_limit: int,
         retriever_soft_limit_multiplier: float,
+        retriever_score_threshold: float | None,
         uow: AUnitOfWork,
         summarizer: ATextSummarizer,
         retriever: ARetrieverService,
@@ -46,6 +47,7 @@ class RoutesService(ARoutesService):
     ):
         self.retriever_limit = retriever_limit
         self.retriever_soft_limit_multiplier = retriever_soft_limit_multiplier
+        self.retriever_score_threshold = retriever_score_threshold
         self.uow = uow
         self.retriever = retriever
         self.documents_service = documents_service
@@ -89,6 +91,7 @@ class RoutesService(ARoutesService):
                 limit=self.retriever_limit,
                 sender_id=sender_id,
                 soft_limit_multiplier=self.retriever_soft_limit_multiplier,
+                score_threshold=self.retriever_score_threshold,
             )
 
             if not similar_documents:
