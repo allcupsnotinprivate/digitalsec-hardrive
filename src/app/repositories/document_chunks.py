@@ -23,7 +23,6 @@ class ADocumentChunksRepository(ARepository[DocumentChunk, UUID], abc.ABC):
         sender_id: UUID | None = None,
         is_valid: bool | None = None,
         is_hidden: bool | None = None,
-        chunk_score_threshold: float | None = None,
         exclude_document_ids: Sequence[UUID] | None = None,
     ) -> Sequence[tuple[DocumentChunk, float]]:
         raise NotImplementedError
@@ -45,7 +44,6 @@ class DocumentChunksRepository(ADocumentChunksRepository):
         sender_id: UUID | None = None,
         is_valid: bool | None = None,
         is_hidden: bool | None = None,
-        chunk_score_threshold: float | None = None,
         exclude_document_ids: Sequence[UUID] | None = None,
     ) -> Sequence[tuple[DocumentChunk, float]]:
         vector = embedding
@@ -78,12 +76,6 @@ class DocumentChunksRepository(ADocumentChunksRepository):
 
             forwarded_subquery = exists().where(and_(*forwarded_filters))
             stmt = stmt.where(forwarded_subquery)
-
-        if chunk_score_threshold is not None:
-            if distance_metric == "inner":
-                stmt = stmt.filter(distance_func >= chunk_score_threshold)
-            else:
-                stmt = stmt.filter(distance_func <= chunk_score_threshold)
 
         if exclude_document_ids:
             stmt = stmt.filter(~DocumentChunk.document_id.in_(exclude_document_ids))

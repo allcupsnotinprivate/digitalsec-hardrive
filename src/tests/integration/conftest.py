@@ -1,4 +1,3 @@
-import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,4 +22,6 @@ async def database(pytestconfig) -> PostgresDatabase:
 @pytest_asyncio.fixture
 async def session(database: PostgresDatabase) -> AsyncSession:
     async with database.get_session() as session_:
+        trans = await session_.begin()
         yield session_  # noqa
+        await trans.rollback()
