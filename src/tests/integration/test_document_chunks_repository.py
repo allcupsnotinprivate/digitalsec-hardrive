@@ -6,7 +6,7 @@ from app.repositories.document_chunks import DocumentChunksRepository
 
 
 @pytest.mark.asyncio
-async def test_get_relevant_chunks_filters_by_sender(session: AsyncSession):
+async def test_get_relevant_chunks_filters_by_sender(session: AsyncSession) -> None:
     sender1 = Agent(name="sender1")
     sender2 = Agent(name="sender2")
     recipient = Agent(name="recipient")
@@ -17,8 +17,8 @@ async def test_get_relevant_chunks_filters_by_sender(session: AsyncSession):
     session.add_all([sender1, sender2, recipient, doc1, doc2])
     await session.flush()
 
-    chunk1 = DocumentChunk(content="chunk1", embedding=[0.0]*1024, hash=b"h1", document=doc1)
-    chunk2 = DocumentChunk(content="chunk2", embedding=[0.0]*1024, hash=b"h2", document=doc2)
+    chunk1 = DocumentChunk(content="chunk1", embedding=[0.0] * 1024, hash=b"h1", document=doc1)
+    chunk2 = DocumentChunk(content="chunk2", embedding=[0.0] * 1024, hash=b"h2", document=doc2)
     session.add_all([chunk1, chunk2])
     await session.flush()
 
@@ -26,17 +26,17 @@ async def test_get_relevant_chunks_filters_by_sender(session: AsyncSession):
     fwd2 = Forwarded(sender_id=sender2.id, recipient_id=recipient.id, document_id=doc2.id)
     session.add_all([fwd1, fwd2])
 
-    await session.flush()
+    await session.commit()
 
     repo = DocumentChunksRepository(session)
-    result = await repo.get_relevant_chunks(embedding=[0.0]*1024, limit=10, sender_id=sender1.id)
+    result = await repo.get_relevant_chunks(embedding=[0.0] * 1024, limit=10, sender_id=sender1.id)
     ids = [chunk.id for chunk, _ in result]
     assert chunk1.id in ids
     assert chunk2.id not in ids
 
 
 @pytest.mark.asyncio
-async def test_get_relevant_chunks_filters_by_valid_and_hidden(session: AsyncSession):
+async def test_get_relevant_chunks_filters_by_valid_and_hidden(session: AsyncSession) -> None:
     sender = Agent(name="sender")
     recipient = Agent(name="recipient")
     doc1 = Document(name="doc1")
@@ -65,7 +65,7 @@ async def test_get_relevant_chunks_filters_by_valid_and_hidden(session: AsyncSes
         is_hidden=True,
     )
     session.add_all([fwd1, fwd2])
-    await session.flush()
+    await session.commit()
 
     repo = DocumentChunksRepository(session)
 
@@ -80,8 +80,9 @@ async def test_get_relevant_chunks_filters_by_valid_and_hidden(session: AsyncSes
     assert chunk1.id not in ids_hidden
 
 
+@pytest.mark.sep_database
 @pytest.mark.asyncio
-async def test_get_relevant_chunks_exclude_and_limit(session: AsyncSession):
+async def test_get_relevant_chunks_exclude_and_limit(session: AsyncSession) -> None:
     doc1 = Document(name="doc1")
     doc2 = Document(name="doc2")
     session.add_all([doc1, doc2])
@@ -90,7 +91,7 @@ async def test_get_relevant_chunks_exclude_and_limit(session: AsyncSession):
     chunk1 = DocumentChunk(content="chunk1", embedding=[0.0] * 1024, hash=b"h1", document=doc1)
     chunk2 = DocumentChunk(content="chunk2", embedding=[1.0] * 1024, hash=b"h2", document=doc2)
     session.add_all([chunk1, chunk2])
-    await session.flush()
+    await session.commit()
 
     repo = DocumentChunksRepository(session)
 

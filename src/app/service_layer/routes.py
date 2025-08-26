@@ -1,5 +1,5 @@
 import abc
-from typing import Sequence, Literal
+from typing import Literal, Sequence
 from uuid import UUID
 
 from loguru import logger

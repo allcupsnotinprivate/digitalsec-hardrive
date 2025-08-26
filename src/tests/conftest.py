@@ -3,14 +3,30 @@ from pathlib import Path
 
 import pytest
 
+from tests import TEST_CORE_PATH
+
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
-    parser.addoption("--pg-host", action="store", default="localhost", help="Postgres host for tests")
-    parser.addoption("--pg-port", action="store", default=5432, type=int, help="Postgres port for tests")
-    parser.addoption("--pg-user", action="store", default="digitalsec_username", help="Postgres user for tests")
-    parser.addoption(
-        "--pg-password", action="store", default="digitalsec_password", help="Postgres password for tests"
+    group = parser.getgroup("pg")
+    group.addoption(
+        "--pg-container-image",
+        action="store",
+        default="pgvector/pgvector:pg17",
+        help="Docker image for Postgres testcontainers",
     )
-    parser.addoption("--pg-db", action="store", default="test_digitalsec", help="Postgres database for tests")
+    group.addoption(
+        "--pg-shared-init-scripts",
+        action="store",
+        default=TEST_CORE_PATH / "../../deployment/init-scripts",
+        help="Absolute path to init scripts dir for the shared Postgres container "
+        "(mounted to /docker-entrypoint-initdb.d). Optional.",
+    )
+
+
+def pytest_configure(config: pytest.Config) -> None:
+    config.addinivalue_line(
+        "markers",
+        "sep_database: use a separate PostgreSQL database for this test",
+    )
