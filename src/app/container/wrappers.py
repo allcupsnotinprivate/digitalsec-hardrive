@@ -36,7 +36,7 @@ class TextSummarizerWrapper(infrastructure.TextSummarizer):
 class TextVectorizerWrapper(infrastructure.TextVectorizer):
     def __init__(self, settings: Settings):
         tv = settings.external.vectorizer
-        super().__init__(model=tv.model)
+        super().__init__(model=tv.model, base_url=tv.base_url, api_key=tv.api_key)
 
 
 class RedisClientWrapper(infrastructure.RedisClient):
@@ -65,6 +65,7 @@ class RoutesServiceWrapper(service_layer.RoutesService):
         retriever: service_layer.ARetrieverService,
         documents_service: service_layer.ADocumentsService,
         agents_service: service_layer.A_AgentsService,
+        candidate_evaluator: service_layer.ACandidateEvaluator,
     ):
         router = settings.internal.router
         super().__init__(
@@ -73,9 +74,11 @@ class RoutesServiceWrapper(service_layer.RoutesService):
             retriever_score_threshold=router.retriever_score_threshold,
             retriever_distance_metric=router.retriever_distance_metric,
             retriever_aggregation_method=router.retriever_aggregation_method,
+            candidate_score_threshold=router.candidate_score_threshold,
             uow=uow,
             summarizer=summarizer,
             retriever=retriever,
             documents_service=documents_service,
             agents_service=agents_service,
+            candidate_evaluator=candidate_evaluator,
         )

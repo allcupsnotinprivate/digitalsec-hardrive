@@ -23,6 +23,7 @@ class RouterSettings(BaseModel):
     retriever_distance_metric: Literal["cosine", "l2", "inner"] = Field(default="cosine")
     retriever_aggregation_method: Literal["mean", "max", "top_k_mean"] = Field(default="max")
     investigation_timeout: float = Field(default=300, gt=5)
+    candidate_score_threshold: float = Field(default=0.6, ge=0.0, lt=1.0)
 
 
 class LogsSettings(BaseModel):

@@ -3,6 +3,7 @@ from typing import Any
 
 import nltk
 import numpy as np
+from loguru import logger
 from sklearn.metrics.pairwise import cosine_similarity
 
 from .aClasses import AInfrastructure
@@ -32,7 +33,11 @@ class SemanticTextSegmenter(ATextSegmenter):
         self.language = language
 
     async def chunk(self, content: str) -> list[str]:
+        logger.debug("Start breaking text into chunks", contents_length=len(content))
+
         sentences = self._split_into_sentences(content)
+
+        logger.debug("Text is divided into sentences", sentences_count=len(sentences))
 
         if not sentences:
             return []
@@ -40,6 +45,8 @@ class SemanticTextSegmenter(ATextSegmenter):
         similarities = await self._calculate_sentence_similarities(sentences)
 
         chunks = await self._create_semantic_chunks(sentences, similarities)
+
+        logger.debug("Received chunks by sentence similarity", chunks_count=len(chunks))
 
         return chunks
 

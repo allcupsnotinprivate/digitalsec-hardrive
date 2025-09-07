@@ -6,7 +6,9 @@ class SummarizerSettings(BaseModel):
 
 
 class VectorizerSettings(BaseModel):
-    model: str = Field(default="lm_studio/text-embedding-multilingual-e5-large-instruct")
+    model: str = Field(default="openai/text-embedding-multilingual-e5-large-instruct")
+    base_url: str | None = Field(default="http://localhost:1234")
+    api_key: str = Field(default="...")
 
 
 class PostgresSettings(BaseModel):

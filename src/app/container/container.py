@@ -35,4 +35,5 @@ container.register(
     aioinject.Transient(service_layer.DocumentsService, service_layer.ADocumentsService),
     aioinject.Transient(RetrieverServiceWrapper, service_layer.ARetrieverService),
     aioinject.Transient(RoutesServiceWrapper, service_layer.ARoutesService),
+    aioinject.Transient(service_layer.CandidateEvaluator, service_layer.ACandidateEvaluator),
 )

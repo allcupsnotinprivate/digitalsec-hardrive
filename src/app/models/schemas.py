@@ -23,3 +23,4 @@ class PotentialRecipient(BaseModel):
     agent_id: UUID
     similar_docs: set[SimilarDocumentSource] = Field(default_factory=set)
     is_eligible: bool = Field(default=False)
+    score: float = Field(default=0.0)

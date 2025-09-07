@@ -2,6 +2,8 @@ import abc
 from typing import Sequence
 from uuid import UUID
 
+from loguru import logger
+
 from app.exceptions import NotFoundError
 from app.infrastructure import ATextSegmenter, ATextVectorizer
 from app.models import Document, DocumentChunk, Forwarded
@@ -71,6 +73,8 @@ class DocumentsService(ADocumentsService):
                 )
                 await uow_ctx.document_chunks.add(document_chunk)
                 previous_chunk_id = document_chunk.id
+
+        logger.debug("Document admitted", document_id=document.id, chunks=len(content_chunks))
 
         return document
 

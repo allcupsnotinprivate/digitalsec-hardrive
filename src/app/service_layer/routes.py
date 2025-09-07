@@ -8,6 +8,7 @@ from app.exceptions import BusinessLogicError, NotFoundError, OperationNotAllowe
 from app.infrastructure import ATextSummarizer
 from app.models import Forwarded, PotentialRecipient, ProcessStatus, Route, SimilarDocumentSource
 
+from . import ACandidateEvaluator
 from .aClasses import AService
 from .agents import A_AgentsService
 from .documents import ADocumentsService
@@ -41,22 +42,26 @@ class RoutesService(ARoutesService):
         retriever_score_threshold: float | None,
         retriever_distance_metric: Literal["cosine", "l2", "inner"],
         retriever_aggregation_method: Literal["mean", "max", "top_k_mean"],
+        candidate_score_threshold: float,
         uow: AUnitOfWork,
         summarizer: ATextSummarizer,
         retriever: ARetrieverService,
         documents_service: ADocumentsService,
         agents_service: A_AgentsService,
+        candidate_evaluator: ACandidateEvaluator,
     ):
         self.retriever_limit = retriever_limit
         self.retriever_soft_limit_multiplier = retriever_soft_limit_multiplier
         self.retriever_score_threshold = retriever_score_threshold
         self.retriever_distance_metric = retriever_distance_metric
         self.retriever_aggregation_method = retriever_aggregation_method
+        self.candidate_score_threshold = candidate_score_threshold
         self.uow = uow
         self.retriever = retriever
         self.documents_service = documents_service
         self.agents_service = agents_service
         self.summarizer = summarizer
+        self.candidate_evaluator = candidate_evaluator
 
     async def initialize(self, document_id: UUID) -> Route:
         async with self.uow as uow_ctx:
@@ -123,8 +128,7 @@ class RoutesService(ARoutesService):
                 for similar_doc_recipient in similar_doc_recipients:
                     potential_recipient = potential_recipients.get(similar_doc_recipient.id)
                     if not potential_recipient:
-                        # TODO: mechanism for determining eligibility should be implemented in further steps
-                        potential_recipient = PotentialRecipient(agent_id=similar_doc_recipient.id, is_eligible=True)
+                        potential_recipient = PotentialRecipient(agent_id=similar_doc_recipient.id)
                         potential_recipients[similar_doc_recipient.id] = potential_recipient
 
                     similar_document_source = SimilarDocumentSource(
@@ -134,19 +138,12 @@ class RoutesService(ARoutesService):
 
             # ----- Score potential recipients ------
 
-            # TODO:
-            # 1) Calculate score of potential recipients by:
-            #    a) Frequency of occurrence in found similar documents (more occurrences → higher score).
-            #    b) Semantic similarity of recipient's description (Agent.description / Agent.embedding)
-            #       with summary/document content.
-            #    c) Load factor: inverse of recipient's current workload
-            # 2) Add if necessary:
-            #    a) Take into account `recency` (how long ago last forwarded was sent to this agent).
-            #    b) Take into account prior `success_rate` of forwarding (is_valid in Forwarded) to recipient for similar documents.
-            #    c) Apply exclusion rules if recipient has conflicts of interest or is in a denylist.
-            # 3) Combine metrics into final `weighted_score` with configurable weights:
-            #    final_score = w1 * frequency_score + w2 * semantic_similarity_score + w3 * recency_score + ...
-            #    and cut off (`is_eligible`) by threshold, or sort by final_score.
+            await self.candidate_evaluator.evaluate(
+                sender_id=sender_id,
+                potential_recipients=potential_recipients,
+                similar_documents=similar_documents,
+                eligible_threshold=self.candidate_score_threshold,
+            )
 
             # ----- Build forwarded -----
 
@@ -159,7 +156,7 @@ class RoutesService(ARoutesService):
                         recipient_id=potential_recipient.agent_id,
                         document_id=route.document_id,
                         route_id=route.id,
-                        is_valid=None,
+                        is_valid=None if potential_recipient.is_eligible else False,
                     )
                     predicted_forwards.append(predicted_forwarded)
 
