@@ -34,6 +34,7 @@ def upgrade() -> None:
         sa.Column("is_active", sa.BOOLEAN(), nullable=False),
         sa.Column("id", sa.UUID(), nullable=False),
         sa.Column("created_at", sa.TIMESTAMP(timezone=True), nullable=False),
+        sa.Column("is_default_recipient", sa.BOOLEAN(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
     )
 
@@ -91,6 +92,7 @@ def upgrade() -> None:
         sa.Column("route_id", sa.UUID(), nullable=True),
         sa.Column("id", sa.UUID(), nullable=False),
         sa.Column("created_at", sa.TIMESTAMP(timezone=True), nullable=False),
+        sa.Column("score", sa.FLOAT(), nullable=True),
         sa.CheckConstraint("sender_id != recipient_id", name="ck_forwarded_sender_recipient_different"),
         sa.ForeignKeyConstraint(
             ["document_id"],

@@ -25,6 +25,7 @@ class Agent(Base):
     description: Mapped[str | None] = mapped_column(VARCHAR(512), nullable=True)
     embedding: Mapped[list[float] | None] = mapped_column(Vector(1024), nullable=True)
     is_active: Mapped[bool] = mapped_column(BOOLEAN, nullable=False, insert_default=True)
+    is_default_recipient: Mapped[bool] = mapped_column(BOOLEAN, nullable=False, insert_default=False)
 
 
 class Document(Base):
@@ -72,7 +73,4 @@ class Forwarded(Base):
     route_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("routes.id"), nullable=True)
     score: Mapped[float | None] = mapped_column(FLOAT, nullable=True)
 
-    __table_args__ = (
-        CheckConstraint("sender_id != recipient_id", name="ck_forwarded_sender_recipient_different"),
-        CheckConstraint("score >= 0 AND score <= 1", name="ck_forwarded_score_range"),
-    )
+    __table_args__ = (CheckConstraint("sender_id != recipient_id", name="ck_forwarded_sender_recipient_different"),)

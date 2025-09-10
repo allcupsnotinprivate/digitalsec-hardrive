@@ -116,10 +116,27 @@ class RoutesService(ARoutesService):
                 score_threshold=self.retriever_score_threshold,
                 distance_metric=self.retriever_distance_metric,
                 aggregation_method=self.retriever_aggregation_method,
-                exclude_document_ids=duplicate_documents_ids
+                exclude_document_ids=duplicate_documents_ids,
             )
             if not similar_documents and second_similar_documents:
-                raise BusinessLogicError("No similar documents could be found.")
+                default_recipients = await self.agents_service.get_default_recipients()
+                fallback_score = self.candidate_score_threshold if self.candidate_score_threshold is not None else 0.99
+                predicted_forwards = [
+                    Forwarded(
+                        purpose=None,
+                        sender_id=sender_id,
+                        recipient_id=agent.id,
+                        document_id=route.document_id,
+                        route_id=route.id,
+                        is_valid=None,
+                        score=fallback_score,
+                    )
+                    for agent in default_recipients
+                ]
+                async with self.uow as uow_ctx:
+                    await uow_ctx.forwarded.add_many(predicted_forwards)
+                    route = await uow_ctx.routes.update_status(route_id=route.id, status=ProcessStatus.COMPLETED)
+                return route
 
             second_similar_documents = [(doc, score * 0.55) for doc, score in second_similar_documents]
             similar_documents.extend(second_similar_documents)

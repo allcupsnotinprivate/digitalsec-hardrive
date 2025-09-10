@@ -24,7 +24,9 @@ router = APIRouter()
 @router.post("/agents/register", status_code=201, response_model=AgentOut)
 @inject
 async def register_agent(data: AgentIn, agents_service: Injected[A_AgentsService] = Depends()) -> AgentOut:
-    agent = await agents_service.register(name=data.name, description=data.description)
+    agent = await agents_service.register(
+        name=data.name, description=data.description, is_default_recipient=data.is_default_recipient
+    )
     return AgentOut(id=agent.id)
 
 

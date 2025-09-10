@@ -12,7 +12,7 @@ from .uow import AUnitOfWork
 
 class A_AgentsService(AService, abc.ABC):
     @abc.abstractmethod
-    async def register(self, name: str, description: str | None) -> Agent:
+    async def register(self, name: str, description: str | None, is_default_recipient: bool) -> Agent:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -27,6 +27,10 @@ class A_AgentsService(AService, abc.ABC):
     async def get_existing_recipients_for_document(self, document_id: UUID) -> Sequence[Agent]:
         raise NotImplementedError
 
+    @abc.abstractmethod
+    async def get_default_recipients(self) -> Sequence[Agent]:
+        raise NotImplementedError
+
 
 class AgentsService(A_AgentsService):
     def __init__(
@@ -37,12 +41,17 @@ class AgentsService(A_AgentsService):
         self.uow = uow
         self.vectorizer = vectorizer
 
-    async def register(self, name: str, description: str | None) -> Agent:
+    async def register(self, name: str, description: str | None, is_default_recipient: bool) -> Agent:
         description_embedding = None
         if description:
             description_embedding = await self.vectorizer.vectorize(description)
         async with self.uow as uow_ctx:
-            agent = Agent(name=name, description=description, embedding=description_embedding)
+            agent = Agent(
+                name=name,
+                description=description,
+                embedding=description_embedding,
+                is_default_recipient=is_default_recipient,
+            )
             await uow_ctx.agents.add(agent)
 
         return agent
@@ -67,3 +76,10 @@ class AgentsService(A_AgentsService):
         if not existing_recipients:
             raise NotFoundError("No recipients were found for document.")
         return existing_recipients
+
+    async def get_default_recipients(self) -> Sequence[Agent]:
+        async with self.uow as uow_ctx:
+            recipients = await uow_ctx.agents.get_default_recipients()
+        if not recipients:
+            raise NotFoundError("No default recipients were found.")
+        return recipients

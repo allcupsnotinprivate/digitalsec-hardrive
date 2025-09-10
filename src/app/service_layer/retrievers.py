@@ -2,7 +2,7 @@ import abc
 import statistics
 from collections import defaultdict
 from difflib import SequenceMatcher
-from typing import Literal, Sequence
+from typing import Literal
 from uuid import UUID
 
 import orjson
@@ -53,7 +53,7 @@ class RetrieverService(ARetrieverService):
         aggregation_method: Literal["mean", "max", "top_k_mean"] = "max",
         soft_limit_multiplier: float = 3.0,
         score_threshold: float | None = None,
-        exclude_document_ids: list[UUID] | None = None
+        exclude_document_ids: list[UUID] | None = None,
     ) -> list[tuple[Document, float]]:
         logger.debug(
             "Retriever query",

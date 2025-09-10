@@ -21,6 +21,10 @@ class A_AgentsRepository(ARepository[Agent, UUID], abc.ABC):
     async def get_recipients_from_document(self, document_id: UUID) -> Sequence[Agent]:
         raise NotImplementedError
 
+    @abc.abstractmethod
+    async def get_default_recipients(self) -> Sequence[Agent]:
+        raise NotImplementedError
+
 
 class AgentsRepository(A_AgentsRepository):
     def __init__(self, session: AsyncSession):
@@ -59,6 +63,16 @@ class AgentsRepository(A_AgentsRepository):
         )
 
         stmt = select(self.model_class).where(self.model_class.id.in_(select(forwarded_subquery.c.recipient_id)))
+
+        result = await self.session.execute(stmt)
+        agents = result.scalars().all()
+        return agents
+
+    async def get_default_recipients(self) -> Sequence[Agent]:
+        stmt = select(self.model_class).where(
+            self.model_class.is_default_recipient.is_(True),
+            self.model_class.is_active.is_(True),
+        )
 
         result = await self.session.execute(stmt)
         agents = result.scalars().all()

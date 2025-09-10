@@ -18,6 +18,7 @@ class DocumentOut(BaseAPISchema):
 class AgentIn(BaseAPISchema):
     name: str = Field()
     description: str | None = Field()
+    is_default_recipient: bool = Field(default=False)
 
 
 class AgentOut(BaseAPISchema):

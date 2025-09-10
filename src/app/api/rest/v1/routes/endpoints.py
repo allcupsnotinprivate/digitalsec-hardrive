@@ -57,8 +57,9 @@ async def retrieve_investigation_results(
             ForwardedOut(
                 sender_id=forwarded.sender_id,
                 recipient_id=forwarded.recipient_id,
-                score=round(forwarded.score, 4) if forwarded.score else forwarded.score
-            ) for forwarded in forwards
+                score=round(forwarded.score, 4) if forwarded.score else forwarded.score,
+            )
+            for forwarded in forwards
         ],
     )
     return result
