@@ -28,7 +28,8 @@ class ARetrieverService(AService, abc.ABC):
         aggregation_method: Literal["mean", "max", "top_k_mean"] = "mean",
         soft_limit_multiplier: float = 3.0,
         score_threshold: float | None = None,
-    ) -> Sequence[tuple[Document, float]]:
+        exclude_document_ids: list[UUID] | None = None,
+    ) -> list[tuple[Document, float]]:
         raise NotImplementedError
 
 
@@ -52,7 +53,8 @@ class RetrieverService(ARetrieverService):
         aggregation_method: Literal["mean", "max", "top_k_mean"] = "max",
         soft_limit_multiplier: float = 3.0,
         score_threshold: float | None = None,
-    ) -> Sequence[tuple[Document, float]]:
+        exclude_document_ids: list[UUID] | None = None
+    ) -> list[tuple[Document, float]]:
         logger.debug(
             "Retriever query",
             definition_type="Query" if isinstance(document_id, str) else "Document ID",
@@ -68,6 +70,10 @@ class RetrieverService(ARetrieverService):
             document_chunks = await uow_ctx.document_chunks.get_document_chunks(document_id=document_id)
             relevant_chunks: list[tuple[DocumentChunk, float]] = list()
             for chunk in document_chunks:
+                excluded_documents_ids = [document_id]
+                if exclude_document_ids:
+                    excluded_documents_ids.extend(exclude_document_ids)
+
                 document_relevant_chunks = await uow_ctx.document_chunks.get_relevant_chunks(
                     embedding=chunk.embedding,
                     limit=soft_limit,
@@ -75,7 +81,7 @@ class RetrieverService(ARetrieverService):
                     sender_id=sender_id,
                     is_valid=True,
                     is_hidden=False,
-                    exclude_document_ids=[document_id],
+                    exclude_document_ids=excluded_documents_ids,
                 )
                 for candidate_chunk, chunk_score in document_relevant_chunks:
                     if distance_metric == "inner":

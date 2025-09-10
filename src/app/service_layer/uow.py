@@ -1,11 +1,8 @@
 import abc
-import hashlib
 from contextlib import AbstractAsyncContextManager
 from typing import Any
-from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.sql.expression import text
 
 from app import repositories
 from app.infrastructure import APostgresDatabase
@@ -17,7 +14,6 @@ class AUnitOfWorkContext(abc.ABC):
     agents: repositories.A_AgentsRepository
     document_chunks: repositories.ADocumentChunksRepository
     documents: repositories.ADocumentsRepository
-    document_meta_prototypes: repositories.ADocumentMetaPrototypesRepository
     forwarded: repositories.AForwardedRepository
     routes: repositories.ARoutesRepository
 
@@ -29,10 +25,6 @@ class AUnitOfWorkContext(abc.ABC):
     async def rollback(self) -> None:
         raise NotImplementedError
 
-    @abc.abstractmethod
-    async def lock_advisory(self, key: str | UUID) -> None:
-        raise NotImplementedError
-
 
 class UnitOfWorkContext(AUnitOfWorkContext):
     def __init__(self, session: AsyncSession):
@@ -42,18 +34,12 @@ class UnitOfWorkContext(AUnitOfWorkContext):
         self.documents = repositories.DocumentsRepository(session)
         self.forwarded = repositories.ForwardedRepository(session)
         self.routes = repositories.RoutesRepository(session)
-        self.document_meta_prototypes = repositories.DocumentMetaPrototypesRepository(session)
 
     async def commit(self) -> None:
         await self.session.commit()
 
     async def rollback(self) -> None:
         await self.session.rollback()
-
-    async def lock_advisory(self, key: str | UUID) -> None:
-        hex_ = key.bytes if isinstance(key, UUID) else key.encode()
-        lock_key = int(hashlib.sha256(hex_).hexdigest(), 16) % (2**63)
-        await self.session.execute(text("SELECT pg_advisory_xact_lock(:lock_key)"), {"lock_key": lock_key})
 
 
 class AUnitOfWork(abc.ABC):

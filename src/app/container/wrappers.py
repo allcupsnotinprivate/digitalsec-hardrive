@@ -1,5 +1,6 @@
 from app import infrastructure, service_layer
 from app.configs import Settings
+from app.utils.cleaners import BasicDocumentCleaner
 
 
 class PostgresDatabaseWrapper(infrastructure.PostgresDatabase):
@@ -82,3 +83,8 @@ class RoutesServiceWrapper(service_layer.RoutesService):
             agents_service=agents_service,
             candidate_evaluator=candidate_evaluator,
         )
+
+
+class BasicDocumentCleanerWrapper(BasicDocumentCleaner):
+    def __init__(self, settings: Settings):
+        super().__init__(language=settings.internal.segmenter.language)

@@ -66,20 +66,6 @@ def upgrade() -> None:
     )
 
     op.create_table(
-        "document_meta_prototypes",
-        sa.Column("document_id", sa.UUID(), nullable=False),
-        sa.Column("summary", sa.VARCHAR(), nullable=True),
-        sa.Column("id", sa.UUID(), nullable=False),
-        sa.Column("created_at", sa.TIMESTAMP(timezone=True), nullable=False),
-        sa.ForeignKeyConstraint(
-            ["document_id"],
-            ["documents.id"],
-        ),
-        sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("document_id", "created_at", name="uq_document_meta_prototypes_document_id_created_at"),
-    )
-
-    op.create_table(
         "routes",
         sa.Column("status", ProcessStatusEnum, nullable=False),
         sa.Column("started_at", sa.TIMESTAMP(timezone=True), nullable=True),
@@ -129,7 +115,6 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_table("forwarded")
     op.drop_table("routes")
-    op.drop_table("document_meta_prototypes")
     op.drop_table("document_chunks")
     op.drop_table("documents")
     op.drop_table("agents")

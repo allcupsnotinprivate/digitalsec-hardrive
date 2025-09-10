@@ -1,7 +1,9 @@
+from pathlib import Path
 from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
+from app import LOGS_DIR
 from app.logs import LogLevel
 
 
@@ -29,6 +31,7 @@ class RouterSettings(BaseModel):
 class LogsSettings(BaseModel):
     enable: bool = Field(default=True)
     level: LogLevel = Field(default=LogLevel.INFO)
+    file: Path = Field(default=LOGS_DIR / "journal.log")
 
     @field_validator("level", mode="before")
     def validate_level_field(cls, v: str | int) -> LogLevel:

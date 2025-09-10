@@ -2,8 +2,10 @@ import aioinject
 
 from app import infrastructure, service_layer
 from app.configs import Settings
+from app.utils.cleaners import ATextCleaner
 
 from .wrappers import (
+    BasicDocumentCleanerWrapper,
     PostgresDatabaseWrapper,
     RedisClientWrapper,
     RetrieverServiceWrapper,
@@ -17,6 +19,11 @@ container = aioinject.Container()
 
 # settings
 container.register(aioinject.Object(Settings()))
+
+# utils
+container.register(
+    aioinject.Singleton(BasicDocumentCleanerWrapper, ATextCleaner),
+)
 
 # infrastructure
 container.register(

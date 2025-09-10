@@ -32,7 +32,9 @@ def create_application() -> FastAPI:
     with container.sync_context() as ctx:
         settings: Settings = ctx.resolve(Settings)
 
-    configure_logger(enabled=settings.internal.log.enable, log_level=settings.internal.log.level)
+    configure_logger(
+        enabled=settings.internal.log.enable, log_level=settings.internal.log.level, log_file=settings.internal.log.file
+    )
 
     app = FastAPI(lifespan=lifespan)
 

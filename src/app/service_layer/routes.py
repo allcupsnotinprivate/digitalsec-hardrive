@@ -95,6 +95,7 @@ class RoutesService(ARoutesService):
         try:
             # ----- Retrieve Similar Documents ------
 
+            # similar documents (first line)
             similar_documents = await self.retriever.retrieve_documents_by_similar_document(
                 document_id=route.document_id,
                 limit=self.retriever_limit,
@@ -105,8 +106,23 @@ class RoutesService(ARoutesService):
                 aggregation_method=self.retriever_aggregation_method,
             )
 
-            if not similar_documents:
+            # similar documents (second line)
+            duplicate_documents_ids = [doc.id for doc, _ in similar_documents]
+            second_similar_documents = await self.retriever.retrieve_documents_by_similar_document(
+                document_id=route.document_id,
+                limit=self.retriever_limit,
+                sender_id=None,
+                soft_limit_multiplier=self.retriever_soft_limit_multiplier,
+                score_threshold=self.retriever_score_threshold,
+                distance_metric=self.retriever_distance_metric,
+                aggregation_method=self.retriever_aggregation_method,
+                exclude_document_ids=duplicate_documents_ids
+            )
+            if not similar_documents and second_similar_documents:
                 raise BusinessLogicError("No similar documents could be found.")
+
+            second_similar_documents = [(doc, score * 0.55) for doc, score in second_similar_documents]
+            similar_documents.extend(second_similar_documents)
 
             # ----- Identifying potential recipients ------
 

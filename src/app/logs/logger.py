@@ -1,5 +1,6 @@
 import logging
 import sys
+from pathlib import Path
 from typing import Any, Dict, Final, Iterator, TypeGuard
 
 import litellm
@@ -61,10 +62,7 @@ def patch(record: dict[str, Any]) -> None:
     _patch_context(record)
 
 
-def configure_logger(
-    enabled: bool,
-    log_level: LogLevel,
-) -> None:
+def configure_logger(enabled: bool, log_level: LogLevel, log_file: str | Path) -> None:
     logger.remove()
     logger.configure(
         patcher=patch,  # type: ignore[arg-type] # noqa
@@ -82,6 +80,17 @@ def configure_logger(
 
     if enabled:
         logger.add(sys.stdout, format=logging_format, level=log_level.value, enqueue=True, serialize=False)
+
+        logger.add(
+            str(log_file),
+            format=logging_format,
+            level=log_level.value,
+            enqueue=True,
+            serialize=False,
+            rotation="124 MB",
+            retention="30 days",
+            compression="zip",
+        )
 
     loggers = ("uvicorn", "uvicorn.access", "uvicorn.error", "fastapi", "asyncio", "starlette", "litellm", "litellm.")
 

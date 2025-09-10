@@ -1,5 +1,5 @@
 from .enums import ProcessStatus
-from .models import Agent, Base, Document, DocumentChunk, DocumentMetaPrototype, Forwarded, Route
+from .models import Agent, Base, Document, DocumentChunk, Forwarded, Route
 from .schemas import PotentialRecipient, SimilarDocumentSource
 
 __all__ = [
@@ -10,7 +10,6 @@ __all__ = [
     "Base",
     "Document",
     "DocumentChunk",
-    "DocumentMetaPrototype",
     "Forwarded",
     "Route",
     # schemas

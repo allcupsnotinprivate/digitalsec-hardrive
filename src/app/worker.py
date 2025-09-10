@@ -16,7 +16,9 @@ def create_celery_app() -> Celery:
         include=["app.tasks.routes"],
     )
 
-    configure_logger(enabled=settings.internal.log.enable, log_level=settings.internal.log.level)
+    configure_logger(
+        enabled=settings.internal.log.enable, log_level=settings.internal.log.level, log_file=settings.internal.log.file
+    )
 
     app.conf.update(
         task_soft_time_limit=settings.internal.router.investigation_timeout,

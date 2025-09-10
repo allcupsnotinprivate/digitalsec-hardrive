@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import BOOLEAN, TIMESTAMP, VARCHAR, CheckConstraint, ForeignKey, UniqueConstraint
+from sqlalchemy import BOOLEAN, TIMESTAMP, VARCHAR, CheckConstraint, ForeignKey
 from sqlalchemy.dialects.postgresql import BYTEA, ENUM, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -49,17 +49,6 @@ class DocumentChunk(Base):
     document_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("documents.id"), nullable=False)
 
     document: Mapped["Document"] = relationship(back_populates="chunks")
-
-
-class DocumentMetaPrototype(Base):
-    __tablename__ = "document_meta_prototypes"
-
-    document_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("documents.id"), nullable=False)
-    summary: Mapped[str | None] = mapped_column(VARCHAR, nullable=True)
-
-    __table_args__ = (
-        UniqueConstraint("document_id", "created_at", name="uq_document_meta_prototypes_document_id_created_at"),
-    )
 
 
 class Route(Base):

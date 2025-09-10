@@ -2,11 +2,13 @@ import abc
 from typing import Sequence
 from uuid import UUID
 
+import numpy as np
 from loguru import logger
 
 from app.exceptions import NotFoundError
 from app.infrastructure import ATextSegmenter, ATextVectorizer
 from app.models import Document, DocumentChunk, Forwarded
+from app.utils.cleaners import ATextCleaner
 from app.utils.hash import create_sha256_hash
 
 from .aClasses import AService
@@ -45,25 +47,32 @@ class ADocumentsService(AService, abc.ABC):
 
 class DocumentsService(ADocumentsService):
     def __init__(
-        self,
-        uow: AUnitOfWork,
-        segmenter: ATextSegmenter,
-        vectorizer: ATextVectorizer,
+        self, uow: AUnitOfWork, segmenter: ATextSegmenter, vectorizer: ATextVectorizer, text_cleaner: ATextCleaner
     ):
         self.uow = uow
         self.segmenter = segmenter
         self.vectorizer = vectorizer
+        self.text_cleaner = text_cleaner
 
     async def admit(self, name: str, content: str) -> Document:
-        content_chunks = await self.segmenter.chunk(content)
+        clean_content = self.text_cleaner.clean(content)
+        logger.debug("Text cleared", original_size=len(content), final_size=len(clean_content))
+
+        content_chunks = await self.segmenter.chunk(clean_content)
         async with self.uow as uow_ctx:
             document = Document(name=name)
             await uow_ctx.documents.add(document)
 
             previous_chunk_id = None
             for i, chunk in enumerate(content_chunks):
-                chunk_embedding = await self.vectorizer.vectorize(chunk)
                 chunk_hash = create_sha256_hash(chunk)
+
+                try:
+                    chunk_embedding = await self.vectorizer.vectorize(chunk)
+                except (Exception,):
+                    logger.exception("Failed to vectorize chunk", chunk_length=len(chunk), chunk_hash=chunk_hash)
+                    chunk_embedding = np.zeros(1024)  # type: ignore[assignment]
+
                 document_chunk = DocumentChunk(
                     content=chunk,
                     embedding=chunk_embedding,
