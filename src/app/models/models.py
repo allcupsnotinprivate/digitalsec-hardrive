@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import BOOLEAN, TIMESTAMP, VARCHAR, CheckConstraint, ForeignKey
+from sqlalchemy import BOOLEAN, FLOAT, TIMESTAMP, VARCHAR, CheckConstraint, ForeignKey
 from sqlalchemy.dialects.postgresql import BYTEA, ENUM, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -70,5 +70,9 @@ class Forwarded(Base):
     recipient_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("agents.id"), nullable=False)
     document_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("documents.id"), nullable=False)
     route_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("routes.id"), nullable=True)
+    score: Mapped[float | None] = mapped_column(FLOAT, nullable=True)
 
-    __table_args__ = (CheckConstraint("sender_id != recipient_id", name="ck_forwarded_sender_recipient_different"),)
+    __table_args__ = (
+        CheckConstraint("sender_id != recipient_id", name="ck_forwarded_sender_recipient_different"),
+        CheckConstraint("score >= 0 AND score <= 1", name="ck_forwarded_score_range"),
+    )

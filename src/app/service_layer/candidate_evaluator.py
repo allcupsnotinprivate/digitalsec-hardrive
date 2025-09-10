@@ -42,7 +42,8 @@ class CandidateEvaluator(ACandidateEvaluator):
             total = frequency_scores.get(agent_id, 0.0)
             total += collaborative_scores.get(agent_id, 0.0)
             total += historical_scores.get(agent_id, 0.0)
-            recipient.score = total / 3
+            score = total / 3
+            recipient.score = max(0.0, min(1.0, score))
             recipient.is_eligible = recipient.score > eligible_threshold
 
             logger.debug(

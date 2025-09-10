@@ -26,6 +26,7 @@ class RouteInvestigationIn(BaseAPISchema):
 class ForwardedOut(BaseAPISchema):
     sender_id: UUID | None
     recipient_id: UUID | None
+    score: float | None
 
 
 class RouteInvestigationOut(BaseAPISchema):

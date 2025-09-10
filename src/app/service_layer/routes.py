@@ -173,6 +173,7 @@ class RoutesService(ARoutesService):
                         document_id=route.document_id,
                         route_id=route.id,
                         is_valid=None if potential_recipient.is_eligible else False,
+                        score=potential_recipient.score,
                     )
                     predicted_forwards.append(predicted_forwarded)
 
