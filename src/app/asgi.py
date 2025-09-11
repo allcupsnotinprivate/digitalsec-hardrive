@@ -5,7 +5,7 @@ from aioinject.ext.fastapi import AioInjectMiddleware
 from fastapi import FastAPI
 
 from app import infrastructure
-from app.api import add_exception_handlers, register_tasks
+from app.api import add_exception_handlers, register_handlers, register_tasks
 from app.api import router as root_router
 from app.configs import Settings
 from app.container import container
@@ -17,14 +17,16 @@ from app.middlewares import RequestContextMiddleware
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     async with container:  # noqa: E117
         with container.sync_context() as ctx:
+            settings: Settings = ctx.resolve(Settings)
             database: infrastructure.APostgresDatabase = ctx.resolve(infrastructure.APostgresDatabase)
             scheduler: infrastructure.ASchedulerManager = ctx.resolve(infrastructure.ASchedulerManager)  # type: ignore[type-abstract]
             rmq: infrastructure.ARabbitMQ = ctx.resolve(infrastructure.ARabbitMQ)
 
         await database.startup()
-        register_tasks(scheduler)
+        register_tasks(scheduler, settings)
         scheduler.start(paused=False)
         await rmq.startup()
+        await register_handlers(rmq)
         yield
         await rmq.shutdown()
         scheduler.shutdown(wait=True)

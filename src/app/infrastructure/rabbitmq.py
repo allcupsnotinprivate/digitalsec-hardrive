@@ -7,10 +7,8 @@ from aio_pika import ExchangeType
 from .aClasses import AInfrastructure
 
 DOCUMENT_EXCHANGE = "documents"
+# queues
 DOCUMENT_QUEUE = "documents"
-FAILED_DOCUMENT_QUEUE = "documents_failed"
-INVESTIGATION_COMPLETED_QUEUE = "investigation_completed"
-DOCUMENT_FAILED_NOTIFICATION_QUEUE = "document_failed"
 
 
 class ARabbitMQ(AInfrastructure):
@@ -55,9 +53,6 @@ class RabbitMQ(ARabbitMQ):
             DOCUMENT_EXCHANGE, ExchangeType.DIRECT
         )
         await self._declare_and_bind_queue(DOCUMENT_QUEUE)
-        await self._declare_and_bind_queue(FAILED_DOCUMENT_QUEUE)
-        await self._declare_and_bind_queue(INVESTIGATION_COMPLETED_QUEUE)
-        await self._declare_and_bind_queue(DOCUMENT_FAILED_NOTIFICATION_QUEUE)
 
     async def _declare_and_bind_queue(self, name: str) -> None:
         assert self._exchange is not None
