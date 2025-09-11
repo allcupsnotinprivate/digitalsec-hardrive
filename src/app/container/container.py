@@ -7,6 +7,7 @@ from app.utils.cleaners import ATextCleaner
 from .wrappers import (
     BasicDocumentCleanerWrapper,
     PostgresDatabaseWrapper,
+    RabbitMQWrapper,
     RedisClientWrapper,
     RetrieverServiceWrapper,
     RoutesServiceWrapper,
@@ -33,6 +34,7 @@ container.register(
     aioinject.Singleton(SemanticTextSegmenterWrapper, infrastructure.ATextSegmenter),
     aioinject.Singleton(TextSummarizerWrapper, infrastructure.ATextSummarizer),
     aioinject.Singleton(RedisClientWrapper, infrastructure.ARedisClient),
+    aioinject.Singleton(RabbitMQWrapper, infrastructure.ARabbitMQ),
 )
 
 # service layer

@@ -88,3 +88,8 @@ class RoutesServiceWrapper(service_layer.RoutesService):
 class BasicDocumentCleanerWrapper(BasicDocumentCleaner):
     def __init__(self, settings: Settings):
         super().__init__(language=settings.internal.segmenter.language)
+
+
+class RabbitMQWrapper(infrastructure.RabbitMQ):
+    def __init__(self, settings: Settings):
+        super().__init__(settings.external.rabbitmq.url)

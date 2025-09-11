@@ -17,7 +17,7 @@ router = APIRouter()
 async def initialize_routing(
     data: RouteDocumentIn, routes_service: Injected[ARoutesService] = Depends()
 ) -> RouteDocumentOut:
-    route = await routes_service.initialize(document_id=data.document_id)
+    route = await routes_service.initialize(document_id=data.document_id, sender_id=data.sender_id)
     return RouteDocumentOut(
         id=route.id, status=route.status, started_at=route.started_at, completed_at=route.completed_at
     )
@@ -40,7 +40,6 @@ async def investigate_routing(
 ) -> None:
     investigate_route.delay(
         str(route_id),
-        str(data.sender_id) if data.sender_id else None,
         allow_recovery=data.allow_recovery,
     )
 

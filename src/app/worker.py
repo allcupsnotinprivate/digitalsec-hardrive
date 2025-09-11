@@ -31,7 +31,11 @@ def create_celery_app() -> Celery:
         "check-stale-investigations": {
             "task": "app.tasks.routes.check_stale_investigations",
             "schedule": settings.internal.router.investigation_timeout,
-        }
+        },
+        "process-pending-routes": {
+            "task": "app.tasks.routes.process_pending_routes",
+            "schedule": 30.0,
+        },
     }
 
     return app

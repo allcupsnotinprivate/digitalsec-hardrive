@@ -74,9 +74,14 @@ def upgrade() -> None:
         sa.Column("document_id", sa.UUID(), nullable=False),
         sa.Column("id", sa.UUID(), nullable=False),
         sa.Column("created_at", sa.TIMESTAMP(timezone=True), nullable=False),
+        sa.Column("sender_id", sa.UUID(), nullable=True),
         sa.ForeignKeyConstraint(
             ["document_id"],
             ["documents.id"],
+        ),
+        sa.ForeignKeyConstraint(
+            ["sender_id"],
+            ["agents.id"],
         ),
         sa.PrimaryKeyConstraint("id"),
     )

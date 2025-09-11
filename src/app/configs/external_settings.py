@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 
 class SummarizerSettings(BaseModel):
@@ -27,8 +27,21 @@ class RedisSettings(BaseModel):
     password: str = Field(default="digitalsec_password")
 
 
+class RabbitMQSettings(BaseModel):
+    host: str = Field(default="0.0.0.0")
+    port: int = Field(default=5672)
+    user: str = Field(default="guest")
+    password: str = Field(default="guest")
+
+    @computed_field
+    def url(self) -> str:
+        domain = self.host if not self.host else f"{self.host}:{self.port}"
+        return f"amqp://{self.user}:{self.password}@{domain}/"
+
+
 class ExternalSettings(BaseModel):
     postgres: PostgresSettings = Field(default_factory=PostgresSettings)
     summarizer: SummarizerSettings = Field(default_factory=SummarizerSettings)
     vectorizer: VectorizerSettings = Field(default_factory=VectorizerSettings)
     redis: RedisSettings = Field(default_factory=RedisSettings)
+    rabbitmq: RabbitMQSettings = Field(default_factory=RabbitMQSettings)

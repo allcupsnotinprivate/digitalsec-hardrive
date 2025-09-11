@@ -18,7 +18,7 @@ from .uow import AUnitOfWork
 
 class ARoutesService(AService, abc.ABC):
     @abc.abstractmethod
-    async def initialize(self, document_id: UUID) -> Route:
+    async def initialize(self, document_id: UUID, sender_id: UUID | None = None) -> Route:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -26,7 +26,7 @@ class ARoutesService(AService, abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def investigate(self, id: UUID, sender_id: UUID | None, allow_recovery: bool = False) -> Route:
+    async def investigate(self, id: UUID, allow_recovery: bool = False) -> Route:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -63,9 +63,9 @@ class RoutesService(ARoutesService):
         self.summarizer = summarizer
         self.candidate_evaluator = candidate_evaluator
 
-    async def initialize(self, document_id: UUID) -> Route:
+    async def initialize(self, document_id: UUID, sender_id: UUID | None = None) -> Route:
         async with self.uow as uow_ctx:
-            route = Route(document_id=document_id)
+            route = Route(document_id=document_id, sender_id=sender_id)
             await uow_ctx.routes.add(route)
         return route
 
@@ -76,11 +76,12 @@ class RoutesService(ARoutesService):
                 raise NotFoundError(f"Route with id={id} not found")
         return route
 
-    async def investigate(self, id: UUID, sender_id: UUID | None, allow_recovery: bool = False) -> Route:
-        if not sender_id:
-            raise BusinessLogicError("It is impossible to conduct investigation without information about sender.")
-
+    async def investigate(self, id: UUID, allow_recovery: bool = False) -> Route:
         route = await self.retrieve(id)
+
+        # TODO: It is assumed that it is possible to investigate without sender, but components are not ready for this
+        if route.sender_id is None:
+            raise BusinessLogicError("It is impossible to conduct investigation without information about sender.")
 
         if route.status != ProcessStatus.PENDING:
             if allow_recovery and route.status in (ProcessStatus.FAILED, ProcessStatus.TIMEOUT):
@@ -99,7 +100,7 @@ class RoutesService(ARoutesService):
             similar_documents = await self.retriever.retrieve_documents_by_similar_document(
                 document_id=route.document_id,
                 limit=self.retriever_limit,
-                sender_id=sender_id,
+                sender_id=route.sender_id,
                 soft_limit_multiplier=self.retriever_soft_limit_multiplier,
                 score_threshold=self.retriever_score_threshold,
                 distance_metric=self.retriever_distance_metric,
@@ -124,7 +125,7 @@ class RoutesService(ARoutesService):
                 predicted_forwards = [
                     Forwarded(
                         purpose=None,
-                        sender_id=sender_id,
+                        sender_id=route.sender_id,
                         recipient_id=agent.id,
                         document_id=route.document_id,
                         route_id=route.id,
@@ -148,13 +149,13 @@ class RoutesService(ARoutesService):
             for similar_doc, similar_score in similar_documents:
                 try:
                     similar_doc_recipients = await self.agents_service.get_existing_recipients_for_sender(
-                        sender_id=sender_id, document_id=similar_doc.id
+                        sender_id=route.sender_id, document_id=similar_doc.id
                     )
                 except (Exception,):
                     logger.warning(
                         "No potential recipients found for similar document.",
                         similar_document_id=similar_doc.id,
-                        sender_id=sender_id,
+                        sender_id=route.sender_id,
                     )
                     continue
 
@@ -172,7 +173,7 @@ class RoutesService(ARoutesService):
             # ----- Score potential recipients ------
 
             await self.candidate_evaluator.evaluate(
-                sender_id=sender_id,
+                sender_id=route.sender_id,
                 potential_recipients=potential_recipients,
                 similar_documents=similar_documents,
                 eligible_threshold=self.candidate_score_threshold,
@@ -185,7 +186,7 @@ class RoutesService(ARoutesService):
                 if potential_recipient.is_eligible:
                     predicted_forwarded = Forwarded(
                         purpose=None,
-                        sender_id=sender_id,
+                        sender_id=route.sender_id,
                         recipient_id=potential_recipient.agent_id,
                         document_id=route.document_id,
                         route_id=route.id,

@@ -19,11 +19,14 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         with container.sync_context() as ctx:
             database: infrastructure.APostgresDatabase = ctx.resolve(infrastructure.APostgresDatabase)
             scheduler: infrastructure.ASchedulerManager = ctx.resolve(infrastructure.ASchedulerManager)  # type: ignore[type-abstract]
+            rmq: infrastructure.ARabbitMQ = ctx.resolve(infrastructure.ARabbitMQ)
 
         await database.startup()
         register_tasks(scheduler)
         scheduler.start(paused=False)
+        await rmq.startup()
         yield
+        await rmq.shutdown()
         scheduler.shutdown(wait=True)
         await database.shutdown()
 

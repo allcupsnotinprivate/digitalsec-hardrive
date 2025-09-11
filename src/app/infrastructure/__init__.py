@@ -1,4 +1,5 @@
 from .database import APostgresDatabase, ASQLDatabase, PostgresDatabase
+from .rabbitmq import ARabbitMQ, RabbitMQ
 from .redis import ARedisClient, RedisClient
 from .scheduler import ASchedulerManager, CronArgs, DateArgs, IntervalArgs, JobSchedule, SchedulerManager, TriggerType
 from .segmenters import ATextSegmenter, SemanticTextSegmenter
@@ -9,6 +10,8 @@ __all__ = [
     "ASQLDatabase",
     "APostgresDatabase",
     "PostgresDatabase",
+    "ARabbitMQ",
+    "RabbitMQ",
     "ASchedulerManager",
     "SchedulerManager",
     "ARedisClient",
