@@ -10,10 +10,7 @@ from app.utils.timestamps import now_with_tz
 
 
 @inject
-async def check_stale_investigations(
-        investigation_timeout: float,
-        uow: Injected[AUnitOfWork]
-) -> None:
+async def check_stale_investigations(investigation_timeout: float, uow: Injected[AUnitOfWork]) -> None:
     async with uow as uow_ctx:
         stmt = select(Route.id).where(
             Route.status == ProcessStatus.IN_PROGRESS,

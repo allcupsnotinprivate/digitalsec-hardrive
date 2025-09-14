@@ -37,7 +37,7 @@ async def retrieve_route(id: UUID = Query(), routes_service: Injected[ARoutesSer
 async def investigate_routing(
     route_id: UUID = Query(alias="routeId"),
     data: RouteInvestigationIn = Body(),
-    routes_service: Injected[ARoutesService] = Depends()
+    routes_service: Injected[ARoutesService] = Depends(),
 ) -> None:
     # TODO: replace with more reliable mechanism
     asyncio.create_task(routes_service.investigate(id=route_id, allow_recovery=data.allow_recovery))

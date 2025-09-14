@@ -1,21 +1,29 @@
+from collections.abc import Callable
+from typing import Any, Awaitable
+
 import aio_pika
 
-from app.api.handlers.documents import handle_document
 from app.infrastructure import ARabbitMQ
 
-CONSUMERS = [
-    handle_document,
-]
+from .documents import handle_document
+from .investigations import handle_investigation
+
+CONSUMERS = [handle_document, handle_investigation]
 
 
-async def register_handlers(rmq: ARabbitMQ):
+def make_wrapper(
+    fn: Callable[[aio_pika.IncomingMessage], Awaitable[Any]],
+) -> Callable[[aio_pika.IncomingMessage], Awaitable[None]]:
+    async def _wrap(message: aio_pika.IncomingMessage) -> None:
+        async with message.process():
+            await fn(message)
+
+    return _wrap
+
+
+async def register_handlers(rmq: ARabbitMQ) -> None:
     for queue_name, fn in CONSUMERS:
-        queue = await rmq.channel.declare_queue(queue_name, durable=True)
+        await rmq.consume(queue_name, make_wrapper(fn))
 
-        async def _wrap(message: aio_pika.IncomingMessage, fn=fn):
-            async with message.process():
-                await fn(message)
-
-        await queue.consume(_wrap)
 
 __all__ = ["register_handlers"]

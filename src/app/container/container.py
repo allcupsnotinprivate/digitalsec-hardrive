@@ -1,3 +1,6 @@
+import asyncio
+from typing import NewType
+
 import aioinject
 
 from app import infrastructure, service_layer
@@ -16,10 +19,25 @@ from .wrappers import (
     TextVectorizerWrapper,
 )
 
+# DI Keys
+DocumentsSemaphore = NewType("DocumentsSemaphore", asyncio.Semaphore)
+InvestigationSemaphore = NewType("InvestigationSemaphore", asyncio.Semaphore)
+
+# Container & settings
+
 container = aioinject.Container()
+settings = Settings()
 
 # settings
-container.register(aioinject.Object(Settings()))
+container.register(aioinject.Object(settings))
+
+# resources
+container.register(
+    aioinject.Object(asyncio.Semaphore(settings.internal.documents.loading_parallelism), DocumentsSemaphore)
+)
+container.register(
+    aioinject.Object(asyncio.Semaphore(settings.internal.router.investigation_parallelism), InvestigationSemaphore)
+)
 
 # utils
 container.register(

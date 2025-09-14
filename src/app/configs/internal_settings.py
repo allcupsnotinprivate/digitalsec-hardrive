@@ -26,6 +26,11 @@ class RouterSettings(BaseModel):
     retriever_aggregation_method: Literal["mean", "max", "top_k_mean"] = Field(default="max")
     investigation_timeout: float = Field(default=300, gt=5)
     candidate_score_threshold: float = Field(default=0.6, ge=0.0, lt=1.0)
+    investigation_parallelism: int = Field(default=4, ge=1)
+
+
+class DocumentsAdmissionSettings(BaseModel):
+    loading_parallelism: int = Field(default=2, ge=1)
 
 
 class LogsSettings(BaseModel):
@@ -43,3 +48,4 @@ class InternalSettings(BaseModel):
     segmenter: SegmenterSettings = Field(default_factory=SegmenterSettings)
     retriever: RetrieverSettings = Field(default_factory=RetrieverSettings)
     router: RouterSettings = Field(default_factory=RouterSettings)
+    documents: DocumentsAdmissionSettings = Field(default_factory=DocumentsAdmissionSettings)

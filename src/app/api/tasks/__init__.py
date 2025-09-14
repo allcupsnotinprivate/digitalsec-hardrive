@@ -12,7 +12,7 @@ def register_tasks(scheduler_manager: ASchedulerManager, settings: Settings) -> 
             trigger_args=IntervalArgs(seconds=60),
         ),
         job_id="check_stale_investigations",
-        kwargs={"investigation_timeout": settings.internal.router.investigation_timeout}
+        kwargs={"investigation_timeout": settings.internal.router.investigation_timeout},
     )
 
 

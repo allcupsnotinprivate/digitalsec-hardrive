@@ -92,4 +92,4 @@ class BasicDocumentCleanerWrapper(BasicDocumentCleaner):
 
 class RabbitMQWrapper(infrastructure.RabbitMQ):
     def __init__(self, settings: Settings):
-        super().__init__(settings.external.rabbitmq.url)
+        super().__init__(settings.external.rabbitmq.url)  # type: ignore[arg-type]

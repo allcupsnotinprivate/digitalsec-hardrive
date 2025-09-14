@@ -149,7 +149,8 @@ class RoutesService(ARoutesService):
             for similar_doc, similar_score in similar_documents:
                 try:
                     similar_doc_recipients = await self.agents_service.get_existing_recipients_for_sender(
-                        sender_id=route.sender_id, document_id=similar_doc.id
+                        sender_id=route.sender_id,  # type: ignore[arg-type]
+                        document_id=similar_doc.id,
                     )
                 except (Exception,):
                     logger.warning(
@@ -173,7 +174,7 @@ class RoutesService(ARoutesService):
             # ----- Score potential recipients ------
 
             await self.candidate_evaluator.evaluate(
-                sender_id=route.sender_id,
+                sender_id=route.sender_id,  # type: ignore[arg-type]
                 potential_recipients=potential_recipients,
                 similar_documents=similar_documents,
                 eligible_threshold=self.candidate_score_threshold,

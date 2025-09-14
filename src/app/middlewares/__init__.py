@@ -1,3 +1,3 @@
-from .request_context import RequestContextMiddleware
+from .request_context import RabbitMQContextMiddleware, RequestContextMiddleware
 
-__all__ = ["RequestContextMiddleware"]
+__all__ = ["RequestContextMiddleware", "RabbitMQContextMiddleware"]
