@@ -1,5 +1,6 @@
 from app import infrastructure, service_layer
 from app.configs import Settings
+from app.container.keys import RedisCache
 from app.utils.cleaners import BasicDocumentCleaner
 
 
@@ -17,7 +18,7 @@ class PostgresDatabaseWrapper(infrastructure.PostgresDatabase):
 
 
 class SemanticTextSegmenterWrapper(infrastructure.SemanticTextSegmenter):
-    def __init__(self, settings: Settings, vectorizer: infrastructure.ATextVectorizer):
+    def __init__(self, settings: Settings, vectorizer: infrastructure.ATextVectorizer, cache: RedisCache):
         sg = settings.internal.segmenter
         super().__init__(
             max_chunk_size=sg.max_chunk_size,
@@ -25,6 +26,7 @@ class SemanticTextSegmenterWrapper(infrastructure.SemanticTextSegmenter):
             similarity_threshold=sg.similarity_threshold,
             language=sg.language,
             vectorizer=vectorizer,
+            cache=cache,
         )
 
 
@@ -35,9 +37,9 @@ class TextSummarizerWrapper(infrastructure.TextSummarizer):
 
 
 class TextVectorizerWrapper(infrastructure.TextVectorizer):
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, cache: RedisCache):
         tv = settings.external.vectorizer
-        super().__init__(model=tv.model, base_url=tv.base_url, api_key=tv.api_key)
+        super().__init__(model=tv.model, base_url=tv.base_url, api_key=tv.api_key, cache=cache)
 
 
 class RedisClientWrapper(infrastructure.RedisClient):

@@ -1,12 +1,13 @@
 import asyncio
-from typing import NewType
 
+import aiocache
 import aioinject
 
 from app import infrastructure, service_layer
 from app.configs import Settings
 from app.utils.cleaners import ATextCleaner
 
+from .keys import DocumentsSemaphore, InvestigationSemaphore, RedisCache
 from .wrappers import (
     BasicDocumentCleanerWrapper,
     PostgresDatabaseWrapper,
@@ -19,10 +20,6 @@ from .wrappers import (
     TextVectorizerWrapper,
 )
 
-# DI Keys
-DocumentsSemaphore = NewType("DocumentsSemaphore", asyncio.Semaphore)
-InvestigationSemaphore = NewType("InvestigationSemaphore", asyncio.Semaphore)
-
 # Container & settings
 
 container = aioinject.Container()
@@ -33,11 +30,11 @@ container.register(aioinject.Object(settings))
 
 # resources
 container.register(
-    aioinject.Object(asyncio.Semaphore(settings.internal.documents.loading_parallelism), DocumentsSemaphore)
+    aioinject.Object(asyncio.Semaphore(settings.internal.documents.loading_parallelism), DocumentsSemaphore),
+    aioinject.Object(asyncio.Semaphore(settings.internal.router.investigation_parallelism), InvestigationSemaphore),
+    aioinject.Object(aiocache.Cache.from_url(settings.external.redis.url_with_pool_max_size(10)), RedisCache),
 )
-container.register(
-    aioinject.Object(asyncio.Semaphore(settings.internal.router.investigation_parallelism), InvestigationSemaphore)
-)
+
 
 # utils
 container.register(

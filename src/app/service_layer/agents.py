@@ -31,6 +31,19 @@ class A_AgentsService(AService, abc.ABC):
     async def get_default_recipients(self) -> Sequence[Agent]:
         raise NotImplementedError
 
+    @abc.abstractmethod
+    async def search(
+        self,
+        *,
+        page: int,
+        page_size: int,
+        name: str | None,
+        description: str | None,
+        is_active: bool | None,
+        is_default_recipient: bool | None,
+    ) -> tuple[list[Agent], int]:
+        raise NotImplementedError
+
 
 class AgentsService(A_AgentsService):
     def __init__(
@@ -83,3 +96,23 @@ class AgentsService(A_AgentsService):
         if not recipients:
             raise NotFoundError("No default recipients were found.")
         return recipients
+
+    async def search(
+        self,
+        *,
+        page: int,
+        page_size: int,
+        name: str | None,
+        description: str | None,
+        is_active: bool | None,
+        is_default_recipient: bool | None,
+    ) -> tuple[list[Agent], int]:
+        async with self.uow as uow_ctx:
+            return await uow_ctx.agents.search(
+                page=page,
+                page_size=page_size,
+                name=name,
+                description=description,
+                is_active=is_active,
+                is_default_recipient=is_default_recipient,
+            )

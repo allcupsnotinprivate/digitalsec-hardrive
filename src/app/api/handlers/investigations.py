@@ -4,7 +4,7 @@ from uuid import UUID
 from aio_pika import IncomingMessage
 from aioinject import Injected, inject
 
-from app.container.container import InvestigationSemaphore
+from app.container.keys import InvestigationSemaphore
 from app.infrastructure.rabbitmq import INVESTIGATION_QUEUE
 from app.service_layer import ARoutesService
 

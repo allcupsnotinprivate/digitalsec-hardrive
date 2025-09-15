@@ -2,7 +2,10 @@ import abc
 
 import litellm
 import tenacity
+from aiocache import BaseCache
 from loguru import logger
+
+from app.utils.hash import create_md5_hash
 
 from .aClasses import AInfrastructure
 
@@ -14,15 +17,24 @@ class ATextVectorizer(AInfrastructure, abc.ABC):
 
 
 class TextVectorizer(ATextVectorizer):
-    def __init__(self, base_url: str | None, api_key: str, model: str):
+    def __init__(self, base_url: str | None, api_key: str, model: str, cache: BaseCache):
         self.base_url = base_url
         self.model = model
         self.api_key = api_key
+        self.cache = cache
+        self.namespace = "vectorizer"
 
-    # TODO: add cache
     async def vectorize(self, text: str) -> list[float]:
+        cache_key = self.cache.build_key(create_md5_hash(text, as_bytes=False), self.namespace)
+        cached = await self.cache.get(cache_key)
+        if cached is not None:
+            return cached  # type: ignore[no-any-return]
+
         embedding = await self._get_embeddings(text)
         logger.debug("Embedding built", embedding_dim=len(embedding), text_size=len(text))
+
+        await self.cache.set(cache_key, embedding, ttl=300)
+
         return embedding
 
     @tenacity.retry(

@@ -1,10 +1,11 @@
 import abc
-from typing import Literal, Sequence
+from typing import Literal, Sequence, Any
 from uuid import UUID
 
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.expression import and_, asc, exists
+from sqlalchemy.sql.functions import func
 
 from app.models import DocumentChunk, Forwarded
 from app.repositories import ARepository
@@ -29,6 +30,18 @@ class ADocumentChunksRepository(ARepository[DocumentChunk, UUID], abc.ABC):
 
     @abc.abstractmethod
     async def get_document_chunks(self, document_id: UUID) -> list[DocumentChunk]:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    async def search(
+        self,
+        *,
+        page: int,
+        page_size: int,
+        document_id: UUID | None,
+        parent_id: UUID | None,
+        content: str | None,
+    ) -> tuple[list[DocumentChunk], int]:
         raise NotImplementedError
 
 
@@ -107,3 +120,36 @@ class DocumentChunksRepository(ADocumentChunksRepository):
             current_chunk = next_chunk
 
         return ordered_chunks
+
+    async def search(
+        self,
+        *,
+        page: int,
+        page_size: int,
+        document_id: UUID | None,
+        parent_id: UUID | None,
+        content: str | None,
+    ) -> tuple[list[DocumentChunk], int]:
+        filters: list[Any] = []
+        if document_id:
+            filters.append(self.model_class.document_id == document_id)
+        if parent_id:
+            filters.append(self.model_class.parent_id == parent_id)
+        if content:
+            filters.append(self.model_class.content.ilike(f"%{content}%"))
+
+        count_stmt = select(func.count()).select_from(self.model_class).where(*filters)
+        total_result = await self.session.execute(count_stmt)
+        total = int(total_result.scalar_one())
+
+        stmt = (
+            select(self.model_class)
+            .where(*filters)
+            .order_by(self.model_class.created_at.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+
+        result = await self.session.execute(stmt)
+        chunks = list(result.scalars().all())
+        return chunks, total

@@ -1,9 +1,10 @@
 import abc
-from typing import Sequence
+from typing import Sequence, Any
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.functions import func
 
 from app.models import Agent, Forwarded
 from app.repositories import ARepository
@@ -23,6 +24,19 @@ class A_AgentsRepository(ARepository[Agent, UUID], abc.ABC):
 
     @abc.abstractmethod
     async def get_default_recipients(self) -> Sequence[Agent]:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    async def search(
+        self,
+        *,
+        page: int,
+        page_size: int,
+        name: str | None,
+        description: str | None,
+        is_active: bool | None,
+        is_default_recipient: bool | None,
+    ) -> tuple[list[Agent], int]:
         raise NotImplementedError
 
 
@@ -77,3 +91,39 @@ class AgentsRepository(A_AgentsRepository):
         result = await self.session.execute(stmt)
         agents = result.scalars().all()
         return agents
+
+    async def search(
+        self,
+        *,
+        page: int,
+        page_size: int,
+        name: str | None,
+        description: str | None,
+        is_active: bool | None,
+        is_default_recipient: bool | None,
+    ) -> tuple[list[Agent], int]:
+        filters: list[Any] = []
+        if name:
+            filters.append(self.model_class.name.ilike(f"%{name}%"))
+        if description:
+            filters.append(self.model_class.description.ilike(f"%{description}%"))
+        if is_active is not None:
+            filters.append(self.model_class.is_active.is_(is_active))
+        if is_default_recipient is not None:
+            filters.append(self.model_class.is_default_recipient.is_(is_default_recipient))
+
+        count_stmt = select(func.count()).select_from(self.model_class).where(*filters)
+        total_result = await self.session.execute(count_stmt)
+        total = int(total_result.scalar_one())
+
+        stmt = (
+            select(self.model_class)
+            .where(*filters)
+            .order_by(self.model_class.created_at.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+
+        result = await self.session.execute(stmt)
+        agents = list(result.scalars().all())
+        return agents, total

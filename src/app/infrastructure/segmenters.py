@@ -3,8 +3,11 @@ from typing import Any
 
 import nltk
 import numpy as np
+from aiocache import BaseCache
 from loguru import logger
 from sklearn.metrics.pairwise import cosine_similarity
+
+from app.utils.hash import create_md5_hash
 
 from .aClasses import AInfrastructure
 from .vectorizer import ATextVectorizer
@@ -24,6 +27,7 @@ class SemanticTextSegmenter(ATextSegmenter):
         similarity_threshold: float,
         language: str,
         vectorizer: ATextVectorizer,
+        cache: BaseCache,
     ):
         self.vectorizer = vectorizer
 
@@ -31,9 +35,16 @@ class SemanticTextSegmenter(ATextSegmenter):
         self.min_chunk_size = min_chunk_size
         self.similarity_threshold = similarity_threshold
         self.language = language
+        self.cache = cache
+        self.namespace = "segmenter"
 
     async def chunk(self, content: str) -> list[str]:
         logger.debug("Start breaking text into chunks", contents_length=len(content))
+
+        cache_key = self.cache.build_key(create_md5_hash(content, as_bytes=False), self.namespace)
+        cached = await self.cache.get(cache_key)
+        if cached is not None:
+            return cached  # type: ignore[no-any-return]
 
         sentences = self._split_into_sentences(content)
 
@@ -45,6 +56,8 @@ class SemanticTextSegmenter(ATextSegmenter):
         similarities = await self._calculate_sentence_similarities(sentences)
 
         chunks = await self._create_semantic_chunks(sentences, similarities)
+
+        await self.cache.set(cache_key, chunks, ttl=300)
 
         logger.debug("Received chunks by sentence similarity", chunks_count=len(chunks))
 

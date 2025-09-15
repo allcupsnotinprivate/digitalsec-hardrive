@@ -1,4 +1,5 @@
 import abc
+from datetime import datetime
 from typing import Literal, Sequence
 from uuid import UUID
 
@@ -31,6 +32,22 @@ class ARoutesService(AService, abc.ABC):
 
     @abc.abstractmethod
     async def fetch(self, id: UUID) -> tuple[Route, Sequence[Forwarded]]:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    async def search(
+        self,
+        *,
+        page: int,
+        page_size: int,
+        document_id: UUID | None,
+        sender_id: UUID | None,
+        status: ProcessStatus | None,
+        started_from: datetime | None,
+        started_to: datetime | None,
+        completed_from: datetime | None,
+        completed_to: datetime | None,
+    ) -> tuple[list[Route], int]:
         raise NotImplementedError
 
 
@@ -212,3 +229,29 @@ class RoutesService(ARoutesService):
         async with self.uow as uow_ctx:
             forwards = await uow_ctx.forwarded.get_by_route_id(route_id=id)
         return route, forwards
+
+    async def search(
+        self,
+        *,
+        page: int,
+        page_size: int,
+        document_id: UUID | None,
+        sender_id: UUID | None,
+        status: ProcessStatus | None,
+        started_from: datetime | None,
+        started_to: datetime | None,
+        completed_from: datetime | None,
+        completed_to: datetime | None,
+    ) -> tuple[list[Route], int]:
+        async with self.uow as uow_ctx:
+            return await uow_ctx.routes.search(
+                page=page,
+                page_size=page_size,
+                document_id=document_id,
+                sender_id=sender_id,
+                status=status,
+                started_from=started_from,
+                started_to=started_to,
+                completed_from=completed_from,
+                completed_to=completed_to,
+            )

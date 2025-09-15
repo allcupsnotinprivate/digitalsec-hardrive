@@ -4,7 +4,7 @@ from uuid import UUID
 from aio_pika import IncomingMessage
 from aioinject import Injected, inject
 
-from app.container.container import DocumentsSemaphore
+from app.container.keys import DocumentsSemaphore
 from app.infrastructure.rabbitmq import DOCUMENT_QUEUE, FAILED_DOCUMENT_QUEUE, INVESTIGATION_QUEUE, ARabbitMQ
 from app.service_layer import ADocumentsService, ARoutesService
 

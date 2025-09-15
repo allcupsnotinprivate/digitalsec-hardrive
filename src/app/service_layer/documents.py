@@ -1,4 +1,5 @@
 import abc
+from datetime import datetime
 from typing import Sequence
 from uuid import UUID
 
@@ -42,6 +43,46 @@ class ADocumentsService(AService, abc.ABC):
 
     @abc.abstractmethod
     async def retrieve_forwards(self, id: UUID, sender_id: UUID | None) -> Sequence[Forwarded]:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    async def search(
+        self,
+        *,
+        page: int,
+        page_size: int,
+        name: str | None,
+        created_from: datetime | None,
+        created_to: datetime | None,
+    ) -> tuple[list[Document], int]:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    async def search_chunks(
+        self,
+        *,
+        page: int,
+        page_size: int,
+        document_id: UUID | None,
+        parent_id: UUID | None,
+        content: str | None,
+    ) -> tuple[list[DocumentChunk], int]:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    async def search_forwarded(
+        self,
+        *,
+        page: int,
+        page_size: int,
+        document_id: UUID | None,
+        sender_id: UUID | None,
+        recipient_id: UUID | None,
+        route_id: UUID | None,
+        is_valid: bool | None,
+        is_hidden: bool | None,
+        purpose: str | None,
+    ) -> tuple[list[Forwarded], int]:
         raise NotImplementedError
 
 
@@ -125,3 +166,65 @@ class DocumentsService(ADocumentsService):
         async with self.uow as uow_ctx:
             forwards = await uow_ctx.forwarded.get_by_document_id(document_id=id, sender_id=sender_id)
         return forwards
+
+    async def search(
+        self,
+        *,
+        page: int,
+        page_size: int,
+        name: str | None,
+        created_from: datetime | None,
+        created_to: datetime | None,
+    ) -> tuple[list[Document], int]:
+        async with self.uow as uow_ctx:
+            return await uow_ctx.documents.search(
+                page=page,
+                page_size=page_size,
+                name=name,
+                created_from=created_from,
+                created_to=created_to,
+            )
+
+    async def search_chunks(
+        self,
+        *,
+        page: int,
+        page_size: int,
+        document_id: UUID | None,
+        parent_id: UUID | None,
+        content: str | None,
+    ) -> tuple[list[DocumentChunk], int]:
+        async with self.uow as uow_ctx:
+            return await uow_ctx.document_chunks.search(
+                page=page,
+                page_size=page_size,
+                document_id=document_id,
+                parent_id=parent_id,
+                content=content,
+            )
+
+    async def search_forwarded(
+        self,
+        *,
+        page: int,
+        page_size: int,
+        document_id: UUID | None,
+        sender_id: UUID | None,
+        recipient_id: UUID | None,
+        route_id: UUID | None,
+        is_valid: bool | None,
+        is_hidden: bool | None,
+        purpose: str | None,
+    ) -> tuple[list[Forwarded], int]:
+        async with self.uow as uow_ctx:
+            return await uow_ctx.forwarded.search(
+                page=page,
+                page_size=page_size,
+                document_id=document_id,
+                sender_id=sender_id,
+                recipient_id=recipient_id,
+                route_id=route_id,
+                is_valid=is_valid,
+                is_hidden=is_hidden,
+                purpose=purpose,
+            )

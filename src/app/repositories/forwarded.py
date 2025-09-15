@@ -26,6 +26,22 @@ class AForwardedRepository(ARepository[Forwarded, UUID], abc.ABC):
     async def get_recipient_stats_for_sender(self, sender_id: UUID) -> dict[UUID, int]:
         raise NotImplementedError
 
+    @abc.abstractmethod
+    async def search(
+        self,
+        *,
+        page: int,
+        page_size: int,
+        document_id: UUID | None,
+        sender_id: UUID | None,
+        recipient_id: UUID | None,
+        route_id: UUID | None,
+        is_valid: bool | None,
+        is_hidden: bool | None,
+        purpose: str | None,
+    ) -> tuple[list[Forwarded], int]:
+        raise NotImplementedError
+
 
 class ForwardedRepository(AForwardedRepository):
     def __init__(self, session: AsyncSession):
@@ -58,3 +74,48 @@ class ForwardedRepository(AForwardedRepository):
         result = await self.session.execute(stmt)
         pairs = result.all()
         return {recipient_id: count for recipient_id, count in pairs}
+
+    async def search(
+        self,
+        *,
+        page: int,
+        page_size: int,
+        document_id: UUID | None,
+        sender_id: UUID | None,
+        recipient_id: UUID | None,
+        route_id: UUID | None,
+        is_valid: bool | None,
+        is_hidden: bool | None,
+        purpose: str | None,
+    ) -> tuple[list[Forwarded], int]:
+        filters: list[Any] = []
+        if document_id:
+            filters.append(self.model_class.document_id == document_id)
+        if sender_id:
+            filters.append(self.model_class.sender_id == sender_id)
+        if recipient_id:
+            filters.append(self.model_class.recipient_id == recipient_id)
+        if route_id:
+            filters.append(self.model_class.route_id == route_id)
+        if is_valid is not None:
+            filters.append(self.model_class.is_valid.is_(is_valid))
+        if is_hidden is not None:
+            filters.append(self.model_class.is_hidden.is_(is_hidden))
+        if purpose:
+            filters.append(self.model_class.purpose.ilike(f"%{purpose}%"))
+
+        count_stmt = select(func.count()).select_from(self.model_class).where(*filters)
+        total_result = await self.session.execute(count_stmt)
+        total = int(total_result.scalar_one())
+
+        stmt = (
+            select(self.model_class)
+            .where(*filters)
+            .order_by(self.model_class.created_at.desc())
+            .offset((page - 1) * page_size)
+            .limit(page_size)
+        )
+
+        result = await self.session.execute(stmt)
+        forwarded = list(result.scalars().all())
+        return forwarded, total

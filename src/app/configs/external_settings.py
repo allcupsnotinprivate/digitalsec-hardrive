@@ -26,6 +26,9 @@ class RedisSettings(BaseModel):
     database: int = Field(default=0)
     password: str = Field(default="digitalsec_password")
 
+    def url_with_pool_max_size(self, pool_max_size: int) -> str:
+        return f"redis://:{self.password}@{self.host}:{self.port}/{self.database}?pool_max_size={pool_max_size}"
+
 
 class RabbitMQSettings(BaseModel):
     host: str = Field(default="0.0.0.0")
