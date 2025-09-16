@@ -11,27 +11,27 @@ from app.service_layer import A_AgentsService, ADocumentsService, ARoutesService
 from .schemas import (
     AgentIn,
     AgentOut,
+    AgentRead,
     AgentSearchFilters,
     AgentSearchResponse,
+    DocumentChunkRead,
+    DocumentChunkSearchFilters,
+    DocumentChunkSearchResponse,
     DocumentForward,
     DocumentForwardsOut,
     DocumentIn,
     DocumentOut,
+    DocumentRead,
+    DocumentSearchFilters,
+    DocumentSearchResponse,
     ForwardedIn,
     ForwardedOut,
-    AgentRead,
-    DocumentSearchResponse,
-    DocumentSearchFilters,
-    DocumentRead,
-    DocumentChunkSearchResponse,
-    DocumentChunkSearchFilters,
-    DocumentChunkRead,
-    ForwardedSearchResponse,
-    ForwardedSearchFilters,
     ForwardedRead,
+    ForwardedSearchFilters,
+    ForwardedSearchResponse,
+    RouteRead,
     RouteSearchFilters,
     RouteSearchResponse,
-    RouteRead,
 )
 
 router = APIRouter()
@@ -102,8 +102,7 @@ async def search_documents(
 
     return DocumentSearchResponse(
         items=[
-            DocumentRead(id=document.id, name=document.name, created_at=document.created_at)
-            for document in documents
+            DocumentRead(id=document.id, name=document.name, created_at=document.created_at) for document in documents
         ],
         pageInfo=build_page_info(total=total, page=pagination.page, page_size=pagination.page_size),
     )

@@ -20,4 +20,3 @@ class PageMeta(BaseAPISchema):
 def build_page_info(*, total: int, page: int, page_size: int) -> PageMeta:
     pages = math.ceil(total / page_size) if total else 0
     return PageMeta(total=total, page=page, pageSize=page_size, pages=pages)
-

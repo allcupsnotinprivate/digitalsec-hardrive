@@ -1,5 +1,5 @@
 import abc
-from typing import Literal, Sequence, Any
+from typing import Any, Literal, Sequence
 from uuid import UUID
 
 from sqlalchemy import desc, select
