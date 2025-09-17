@@ -1,10 +1,12 @@
-import asyncio
 from uuid import UUID
 
 from aioinject import Injected
 from aioinject.ext.fastapi import inject
-from fastapi import APIRouter, Body, Depends, Query
+from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, status
 
+from app.infrastructure import ARabbitMQ
+from app.infrastructure.rabbitmq import INVESTIGATION_QUEUE
+from app.models import ProcessStatus
 from app.service_layer import ARoutesService
 
 from .schemas import ForwardedOut, RouteDocumentIn, RouteDocumentOut, RouteInvestigationIn, RouteInvestigationOut
@@ -35,12 +37,46 @@ async def retrieve_route(id: UUID = Query(), routes_service: Injected[ARoutesSer
 @router.post("/investigate", status_code=202)
 @inject
 async def investigate_routing(
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
     route_id: UUID = Query(alias="routeId"),
     data: RouteInvestigationIn = Body(),
     routes_service: Injected[ARoutesService] = Depends(),
+    rabbitmq: Injected[ARabbitMQ] = Depends(),
 ) -> None:
-    # TODO: replace with more reliable mechanism
-    asyncio.create_task(routes_service.investigate(id=route_id, allow_recovery=data.allow_recovery))
+    route = await routes_service.retrieve(id=route_id)
+
+    if route.status != ProcessStatus.PENDING and not (
+        data.allow_recovery and route.status in (ProcessStatus.FAILED, ProcessStatus.TIMEOUT)
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Route investigation completed with status {route.status.value}",
+        )
+
+    headers: dict[str, str] = {}
+    if x_request_id:
+        headers["X-Request-ID"] = x_request_id
+
+    await rabbitmq.publish_message(
+        INVESTIGATION_QUEUE,
+        {"route_id": str(route_id), "allow_recovery": data.allow_recovery},
+        headers=headers or None,
+    )
+
+
+@router.post("/cancel", status_code=200, response_model=RouteDocumentOut)
+@inject
+async def cancel_route(
+    route_id: UUID = Query(alias="routeId"), routes_service: Injected[ARoutesService] = Depends()
+) -> RouteDocumentOut:
+    route = await routes_service.cancel(id=route_id)
+
+    return RouteDocumentOut(
+        id=route.id,
+        status=route.status,
+        started_at=route.started_at,
+        completed_at=route.completed_at,
+    )
 
 
 @router.get("/investigations/forwards/fetch", status_code=200, response_model=RouteInvestigationOut)

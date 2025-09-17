@@ -50,6 +50,10 @@ class ARoutesService(AService, abc.ABC):
     ) -> tuple[list[Route], int]:
         raise NotImplementedError
 
+    @abc.abstractmethod
+    async def cancel(self, id: UUID) -> Route:
+        raise NotImplementedError
+
 
 class RoutesService(ARoutesService):
     def __init__(
@@ -255,3 +259,14 @@ class RoutesService(ARoutesService):
                 completed_from=completed_from,
                 completed_to=completed_to,
             )
+
+    async def cancel(self, id: UUID) -> Route:
+        route = await self.retrieve(id)
+
+        if route.status not in (ProcessStatus.PENDING, ProcessStatus.IN_PROGRESS):
+            raise OperationNotAllowedError(f"Route investigation completed with status {route.status.value}")
+
+        async with self.uow as uow_ctx:
+            route = await uow_ctx.routes.update_status(id, ProcessStatus.CANCELLED)
+
+        return route

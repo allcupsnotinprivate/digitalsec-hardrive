@@ -1,9 +1,10 @@
 import abc
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.expression import update
 from sqlalchemy.sql.functions import func
 
 from app.models import Forwarded
@@ -40,6 +41,10 @@ class AForwardedRepository(ARepository[Forwarded, UUID], abc.ABC):
         is_hidden: bool | None,
         purpose: str | None,
     ) -> tuple[list[Forwarded], int]:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    async def update_fields(self, forwarded_id: UUID, updates: Mapping[str, Any]) -> Forwarded | None:
         raise NotImplementedError
 
 
@@ -119,3 +124,19 @@ class ForwardedRepository(AForwardedRepository):
         result = await self.session.execute(stmt)
         forwarded = list(result.scalars().all())
         return forwarded, total
+
+    async def update_fields(self, forwarded_id: UUID, updates: Mapping[str, Any]) -> Forwarded | None:
+        allowed_fields = {"is_valid", "is_hidden", "purpose"}
+        values = {field: updates[field] for field in allowed_fields if field in updates}
+        if not values:
+            return None
+
+        stmt = (
+            update(self.model_class)
+            .where(self.model_class.id == forwarded_id)
+            .values(**values)
+            .returning(self.model_class)
+        )
+
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()

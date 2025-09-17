@@ -1,12 +1,12 @@
 import abc
 from datetime import datetime
-from typing import Sequence
+from typing import Sequence, TypedDict
 from uuid import UUID
 
 import numpy as np
 from loguru import logger
 
-from app.exceptions import NotFoundError
+from app.exceptions import BusinessLogicError, NotFoundError
 from app.infrastructure import ATextSegmenter, ATextVectorizer
 from app.models import Document, DocumentChunk, Forwarded
 from app.utils.cleaners import ATextCleaner
@@ -14,6 +14,12 @@ from app.utils.hash import create_sha256_hash
 
 from .aClasses import AService
 from .uow import AUnitOfWork
+
+
+class ForwardedUpdateData(TypedDict, total=False):
+    is_hidden: bool
+    is_valid: bool | None
+    purpose: str | None
 
 
 class ADocumentsService(AService, abc.ABC):
@@ -83,6 +89,10 @@ class ADocumentsService(AService, abc.ABC):
         is_hidden: bool | None,
         purpose: str | None,
     ) -> tuple[list[Forwarded], int]:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    async def update_forwarded(self, forwarded_id: UUID, changes: ForwardedUpdateData) -> Forwarded:
         raise NotImplementedError
 
 
@@ -228,3 +238,15 @@ class DocumentsService(ADocumentsService):
                 is_hidden=is_hidden,
                 purpose=purpose,
             )
+
+    async def update_forwarded(self, forwarded_id: UUID, changes: ForwardedUpdateData) -> Forwarded:
+        if not changes:
+            raise BusinessLogicError("No fields provided for update")
+
+        async with self.uow as uow_ctx:
+            forwarded = await uow_ctx.forwarded.update_fields(forwarded_id, changes)
+
+            if not forwarded:
+                raise NotFoundError(f"Forwarded with id={forwarded_id} not found")
+
+        return forwarded

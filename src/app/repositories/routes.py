@@ -48,7 +48,12 @@ class RoutesRepository(ARoutesRepository):
             stmt_update = stmt_update.values(started_at=now_with_tz(), completed_at=None)
         elif status == ProcessStatus.PENDING:
             stmt_update = stmt_update.values(started_at=None, completed_at=None)
-        elif status in (status.FAILED, status.COMPLETED, status.TIMEOUT):
+        elif status in (
+            ProcessStatus.FAILED,
+            ProcessStatus.COMPLETED,
+            ProcessStatus.TIMEOUT,
+            ProcessStatus.CANCELLED,
+        ):
             stmt_update = stmt_update.values(completed_at=now_with_tz())
 
         stmt_update = stmt_update.execution_options(synchronize_session="fetch")

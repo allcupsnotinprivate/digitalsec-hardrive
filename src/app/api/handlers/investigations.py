@@ -18,6 +18,7 @@ async def handle_investigation(
 ) -> None:
     data = json.loads(message.body)
     route_id = UUID(data["route_id"])
+    allow_recovery = bool(data.get("allow_recovery", False))
     # TODO: replace with more reliable mechanism
     async with semaphore:
-        await routes_service.investigate(route_id)
+        await routes_service.investigate(route_id, allow_recovery=allow_recovery)

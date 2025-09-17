@@ -39,4 +39,8 @@ async def handle_document(
         await rmq.publish_message(FAILED_DOCUMENT_QUEUE, data, headers=headers)
         return
 
-    await rmq.publish_message(INVESTIGATION_QUEUE, {"route_id": str(route.id)}, headers=headers)
+    await rmq.publish_message(
+        INVESTIGATION_QUEUE,
+        {"route_id": str(route.id), "allow_recovery": False},
+        headers=headers or None,
+    )

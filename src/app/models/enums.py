@@ -8,6 +8,7 @@ class ProcessStatus(str, Enum):
     COMPLETED = "completed"
     FAILED = "failed"
     TIMEOUT = "timeout"
+    CANCELLED = "cancelled"
 
 
 class AnalyticsTimeWindow(str, Enum):

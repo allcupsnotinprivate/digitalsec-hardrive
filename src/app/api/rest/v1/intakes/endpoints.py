@@ -1,4 +1,5 @@
 from collections import defaultdict
+from typing import cast
 from uuid import UUID
 
 from aioinject import Injected
@@ -7,6 +8,7 @@ from fastapi import APIRouter, Depends, Query
 
 from app.api.rest.schemas import PaginationParams, build_page_info
 from app.service_layer import A_AgentsService, ADocumentsService, ARoutesService
+from app.service_layer.documents import ForwardedUpdateData
 
 from .schemas import (
     AgentIn,
@@ -29,6 +31,7 @@ from .schemas import (
     ForwardedRead,
     ForwardedSearchFilters,
     ForwardedSearchResponse,
+    ForwardedUpdateIn,
     RouteRead,
     RouteSearchFilters,
     RouteSearchResponse,
@@ -151,6 +154,34 @@ async def forward_document(
         is_valid=True,
     )
     return ForwardedOut(id=forwarded.id)
+
+
+@router.patch(
+    "/documents/forwards",
+    status_code=200,
+    response_model=ForwardedRead,
+)
+@inject
+async def update_forwarded(
+    data: ForwardedUpdateIn,
+    forward_id: UUID = Query(alias="forwardId"),
+    documents_service: Injected[ADocumentsService] = Depends(),
+) -> ForwardedRead:
+    updates = cast(ForwardedUpdateData, data.model_dump(exclude_unset=True, by_alias=False))
+    forwarded = await documents_service.update_forwarded(forward_id, updates)
+
+    return ForwardedRead(
+        id=forwarded.id,
+        documentId=forwarded.document_id,
+        senderId=forwarded.sender_id,
+        recipientId=forwarded.recipient_id,
+        routeId=forwarded.route_id,
+        purpose=forwarded.purpose,
+        isValid=forwarded.is_valid,
+        isHidden=forwarded.is_hidden,
+        score=forwarded.score,
+        created_at=forwarded.created_at,
+    )
 
 
 @router.get("/documents/forwards/retrieve", status_code=200, response_model=DocumentForwardsOut)

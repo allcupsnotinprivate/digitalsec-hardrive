@@ -92,6 +92,12 @@ class ForwardedIn(BaseAPISchema):
     document_id: UUID = Field()
 
 
+class ForwardedUpdateIn(BaseAPISchema):
+    purpose: str | None = Field(default=None)
+    is_valid: bool | None = Field(default=None)
+    is_hidden: bool | None = Field(default=None)
+
+
 class ForwardedOut(BaseAPISchema):
     id: UUID = Field()
 
