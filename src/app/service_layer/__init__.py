@@ -1,5 +1,6 @@
 from .aClasses import AService
 from .agents import A_AgentsService, AgentsService
+from .analytics import A_AnalyticsService, AnalyticsService
 from .candidate_evaluator import ACandidateEvaluator, CandidateEvaluator
 from .documents import ADocumentsService, DocumentsService
 from .retrievers import ARetrieverService, RetrieverService
@@ -14,6 +15,8 @@ __all__ = [
     "AService",
     "A_AgentsService",
     "AgentsService",
+    "A_AnalyticsService",
+    "AnalyticsService",
     "ACandidateEvaluator",
     "CandidateEvaluator",
     "ADocumentsService",

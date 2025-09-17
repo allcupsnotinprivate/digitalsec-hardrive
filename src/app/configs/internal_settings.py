@@ -33,6 +33,13 @@ class DocumentsAdmissionSettings(BaseModel):
     loading_parallelism: int = Field(default=2, ge=1)
 
 
+class AnalyticsSettings(BaseModel):
+    overview_cache_ttl: int = Field(default=60, ge=0)
+    routes_summary_cache_ttl: int = Field(default=120, ge=0)
+    forwarded_summary_cache_ttl: int = Field(default=120, ge=0)
+    default_bucket_limit: int = Field(default=24, ge=1, le=336)
+
+
 class LogsSettings(BaseModel):
     enable: bool = Field(default=True)
     level: LogLevel = Field(default=LogLevel.INFO)
@@ -49,3 +56,4 @@ class InternalSettings(BaseModel):
     retriever: RetrieverSettings = Field(default_factory=RetrieverSettings)
     router: RouterSettings = Field(default_factory=RouterSettings)
     documents: DocumentsAdmissionSettings = Field(default_factory=DocumentsAdmissionSettings)
+    analytics: AnalyticsSettings = Field(default_factory=AnalyticsSettings)

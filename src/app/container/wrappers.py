@@ -87,6 +87,24 @@ class RoutesServiceWrapper(service_layer.RoutesService):
         )
 
 
+class AnalyticsServiceWrapper(service_layer.AnalyticsService):
+    def __init__(
+        self,
+        settings: Settings,
+        uow: service_layer.AUnitOfWork,
+        redis: infrastructure.ARedisClient,
+    ):
+        analytics = settings.internal.analytics
+        super().__init__(
+            uow=uow,
+            redis=redis,
+            overview_cache_ttl=analytics.overview_cache_ttl,
+            routes_summary_cache_ttl=analytics.routes_summary_cache_ttl,
+            forwarded_summary_cache_ttl=analytics.forwarded_summary_cache_ttl,
+            default_bucket_limit=analytics.default_bucket_limit,
+        )
+
+
 class BasicDocumentCleanerWrapper(BasicDocumentCleaner):
     def __init__(self, settings: Settings):
         super().__init__(language=settings.internal.segmenter.language)

@@ -14,7 +14,7 @@ class VectorizerSettings(BaseModel):
 class PostgresSettings(BaseModel):
     host: str = Field(default="0.0.0.0")
     port: int = Field(default=5432)
-    database: str = Field(default="digitalsec")
+    database: str = Field(default="digitalsec_router")
     user: str = Field(default="digitalsec_username")
     password: str = Field(default="digitalsec_password")
     automigrate: bool = Field(default=True)

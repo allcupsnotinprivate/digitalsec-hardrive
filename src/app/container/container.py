@@ -9,6 +9,7 @@ from app.utils.cleaners import ATextCleaner
 
 from .keys import DocumentsSemaphore, InvestigationSemaphore, RedisCache
 from .wrappers import (
+    AnalyticsServiceWrapper,
     BasicDocumentCleanerWrapper,
     PostgresDatabaseWrapper,
     RabbitMQWrapper,
@@ -60,4 +61,5 @@ container.register(
     aioinject.Transient(RetrieverServiceWrapper, service_layer.ARetrieverService),
     aioinject.Transient(RoutesServiceWrapper, service_layer.ARoutesService),
     aioinject.Transient(service_layer.CandidateEvaluator, service_layer.ACandidateEvaluator),
+    aioinject.Transient(AnalyticsServiceWrapper, service_layer.A_AnalyticsService),
 )

@@ -16,6 +16,7 @@ class AUnitOfWorkContext(abc.ABC):
     documents: repositories.ADocumentsRepository
     forwarded: repositories.AForwardedRepository
     routes: repositories.ARoutesRepository
+    analytics: repositories.A_AnalyticsRepository
 
     @abc.abstractmethod
     async def commit(self) -> None:
@@ -34,6 +35,7 @@ class UnitOfWorkContext(AUnitOfWorkContext):
         self.documents = repositories.DocumentsRepository(session)
         self.forwarded = repositories.ForwardedRepository(session)
         self.routes = repositories.RoutesRepository(session)
+        self.analytics = repositories.AnalyticsRepository(session)
 
     async def commit(self) -> None:
         await self.session.commit()

@@ -1,4 +1,5 @@
 import uuid
+from dataclasses import dataclass
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
@@ -8,7 +9,9 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from app.utils.timestamps import now_with_tz
 
-from .enums import ProcessStatus
+from .enums import AnalyticsTimeWindow, ProcessStatus
+
+# ----- ORM Models -----
 
 ProcessStatusT = ENUM(ProcessStatus, name="process_status", create_type=False)
 
@@ -75,3 +78,166 @@ class Forwarded(Base):
     score: Mapped[float | None] = mapped_column(FLOAT, nullable=True)
 
     __table_args__ = (CheckConstraint("sender_id != recipient_id", name="ck_forwarded_sender_recipient_different"),)
+
+
+# ----- Row Models -----
+
+
+@dataclass(slots=True)
+class RoutesOverviewRow:
+    total: int
+    pending: int
+    in_progress: int
+    completed: int
+    failed: int
+    timeout: int
+    completed_last_24h: int
+    avg_completion_seconds: float | None
+    p95_completion_seconds: float | None
+    avg_queue_seconds: float | None
+    p95_queue_seconds: float | None
+    in_progress_avg_age_seconds: float | None
+    pending_avg_age_seconds: float | None
+
+
+@dataclass(slots=True)
+class RouteBucketRow:
+    bucket_start: datetime
+    total: int
+    completed: int
+    in_progress: int
+    pending: int
+    failed: int
+    timeout: int
+    avg_completion_seconds: float | None
+    avg_queue_seconds: float | None
+
+
+@dataclass(slots=True)
+class ForwardedOverviewRow:
+    total_predictions: int
+    manual_pending: int
+    auto_approved: int
+    auto_rejected: int
+    routes_with_predictions: int
+    routes_manual_pending: int
+    routes_with_rejections: int
+    distinct_recipients: int
+    distinct_senders: int
+    avg_score: float | None
+    manual_avg_score: float | None
+    accepted_avg_score: float | None
+    rejected_avg_score: float | None
+    first_forwarded_at: datetime | None
+    last_forwarded_at: datetime | None
+
+
+@dataclass(slots=True)
+class ForwardedBucketRow:
+    bucket_start: datetime
+    total: int
+    manual_pending: int
+    auto_approved: int
+    auto_rejected: int
+    avg_score: float | None
+
+
+@dataclass(slots=True)
+class InventorySummary:
+    documents_total: int
+    agents_total: int
+    routes_total: int
+
+
+@dataclass(slots=True)
+class RoutesOverview:
+    total: int
+    pending: int
+    in_progress: int
+    completed: int
+    failed: int
+    timeout: int
+    completed_last_24h: int
+    average_completion_seconds: float | None = None
+    completion_p95_seconds: float | None = None
+    average_queue_seconds: float | None = None
+    queue_p95_seconds: float | None = None
+    in_progress_average_age_seconds: float | None = None
+    pending_average_age_seconds: float | None = None
+    failure_rate: float | None = None
+    throughput_per_hour_last_24h: float | None = None
+
+
+@dataclass(slots=True)
+class RouteBucket:
+    bucket_start: datetime
+    bucket_end: datetime
+    total: int
+    completed: int
+    in_progress: int
+    pending: int
+    failed: int
+    timeout: int
+    average_completion_seconds: float | None = None
+    average_queue_seconds: float | None = None
+
+
+@dataclass(slots=True)
+class RoutesSummary:
+    window: AnalyticsTimeWindow
+    bucket_size_seconds: int
+    bucket_limit: int
+    overview: RoutesOverview
+    buckets: list[RouteBucket]
+
+
+@dataclass(slots=True)
+class ForwardedOverview:
+    total_predictions: int
+    manual_pending: int
+    auto_approved: int
+    auto_rejected: int
+    routes_with_predictions: int
+    routes_manual_pending: int
+    routes_auto_resolved: int
+    routes_with_rejections: int
+    average_predictions_per_route: float | None = None
+    auto_resolution_ratio: float | None = None
+    auto_acceptance_rate: float | None = None
+    manual_backlog_ratio: float | None = None
+    routes_coverage_ratio: float | None = None
+    distinct_recipients: int = 0
+    distinct_senders: int = 0
+    average_score: float | None = None
+    manual_average_score: float | None = None
+    accepted_average_score: float | None = None
+    rejected_average_score: float | None = None
+    first_forwarded_at: datetime | None = None
+    last_forwarded_at: datetime | None = None
+
+
+@dataclass(slots=True)
+class ForwardedBucket:
+    bucket_start: datetime
+    bucket_end: datetime
+    total: int
+    manual_pending: int
+    auto_approved: int
+    auto_rejected: int
+    average_score: float | None = None
+
+
+@dataclass(slots=True)
+class ForwardedSummary:
+    window: AnalyticsTimeWindow
+    bucket_size_seconds: int
+    bucket_limit: int
+    overview: ForwardedOverview
+    buckets: list[ForwardedBucket]
+
+
+@dataclass(slots=True)
+class AnalyticsOverview:
+    inventory: InventorySummary
+    routes: RoutesOverview
+    forwarded: ForwardedOverview
