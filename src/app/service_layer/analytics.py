@@ -1,18 +1,22 @@
 import abc
 import json
+import uuid
 from dataclasses import asdict
 from datetime import datetime, timedelta, timezone
 from enum import Enum
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, Sequence, TypeVar
 
 from app.infrastructure import ARedisClient
 from app.models import (
+    AnalyticsFilters,
     AnalyticsOverview,
     AnalyticsTimeWindow,
     ForwardedBucket,
     ForwardedBucketRow,
     ForwardedOverview,
     ForwardedOverviewRow,
+    ForwardedRecipientDistribution,
+    ForwardedRecipientDistributionRow,
     ForwardedSummary,
     InventorySummary,
     RouteBucket,
@@ -30,18 +34,26 @@ T = TypeVar("T")
 
 class A_AnalyticsService(AService, abc.ABC):
     @abc.abstractmethod
-    async def get_overview(self) -> AnalyticsOverview:
+    async def get_overview(self, filters: AnalyticsFilters | None = None) -> AnalyticsOverview:
         raise NotImplementedError
 
     @abc.abstractmethod
     async def get_routes_summary(
-        self, *, window: AnalyticsTimeWindow, bucket_limit: int | None = None
+        self,
+        *,
+        window: AnalyticsTimeWindow,
+        bucket_limit: int | None = None,
+        filters: AnalyticsFilters | None = None,
     ) -> RoutesSummary:
         raise NotImplementedError
 
     @abc.abstractmethod
     async def get_forwarded_summary(
-        self, *, window: AnalyticsTimeWindow, bucket_limit: int | None = None
+        self,
+        *,
+        window: AnalyticsTimeWindow,
+        bucket_limit: int | None = None,
+        filters: AnalyticsFilters | None = None,
     ) -> ForwardedSummary:
         raise NotImplementedError
 
@@ -64,43 +76,61 @@ class AnalyticsService(A_AnalyticsService):
         self.forwarded_summary_cache_ttl = forwarded_summary_cache_ttl
         self.default_bucket_limit = default_bucket_limit
 
-    async def get_overview(self) -> AnalyticsOverview:
+    async def get_overview(self, filters: AnalyticsFilters | None = None) -> AnalyticsOverview:
         cache_key = "analytics:overview:v1"
-        cached = await self._get_cached(cache_key, _dict_to_analytics_overview)
-        if cached is not None:
-            return cached
+        use_cache = _should_use_cache(filters)
+        if use_cache:
+            cached = await self._get_cached(cache_key, _dict_to_analytics_overview)
+            if cached is not None:
+                return cached
 
         async with self.uow as uow_ctx:
             totals = await uow_ctx.analytics.get_totals()
-            routes_overview_row = await uow_ctx.analytics.get_routes_overview()
-            forwarded_overview_row = await uow_ctx.analytics.get_forwarded_overview()
+            routes_overview_row = await uow_ctx.analytics.get_routes_overview(filters=filters)
+            forwarded_overview_row = await uow_ctx.analytics.get_forwarded_overview(filters=filters)
+            distribution_rows = await uow_ctx.analytics.get_forwarded_distribution(filters=filters)
 
         inventory = InventorySummary(**totals)
         routes_overview = _build_routes_overview(routes_overview_row)
-        forwarded_overview = _build_forwarded_overview(forwarded_overview_row, routes_total=inventory.routes_total)
+        forwarded_overview = _build_forwarded_overview(
+            forwarded_overview_row,
+            distribution_rows=distribution_rows,
+            routes_total=inventory.routes_total,
+        )
 
         overview = AnalyticsOverview(inventory=inventory, routes=routes_overview, forwarded=forwarded_overview)
 
-        await self._set_cached(
-            cache_key,
-            overview,
-            _analytics_overview_to_dict,
-            ttl=self.overview_cache_ttl,
-        )
+        if use_cache:
+            await self._set_cached(
+                cache_key,
+                overview,
+                _analytics_overview_to_dict,
+                ttl=self.overview_cache_ttl,
+            )
         return overview
 
     async def get_routes_summary(
-        self, *, window: AnalyticsTimeWindow, bucket_limit: int | None = None
+        self,
+        *,
+        window: AnalyticsTimeWindow,
+        bucket_limit: int | None = None,
+        filters: AnalyticsFilters | None = None,
     ) -> RoutesSummary:
         limit = bucket_limit or self.default_bucket_limit
         cache_key = f"analytics:routes:summary:{window.value}:{limit}"
-        cached = await self._get_cached(cache_key, _dict_to_routes_summary)
-        if cached is not None:
-            return cached
+        use_cache = _should_use_cache(filters)
+        if use_cache:
+            cached = await self._get_cached(cache_key, _dict_to_routes_summary)
+            if cached is not None:
+                return cached
 
         async with self.uow as uow_ctx:
-            overview_row = await uow_ctx.analytics.get_routes_overview()
-            bucket_rows = await uow_ctx.analytics.get_route_buckets(bucket_size=window.delta, bucket_limit=limit)
+            overview_row = await uow_ctx.analytics.get_routes_overview(filters=filters)
+            bucket_rows = await uow_ctx.analytics.get_route_buckets(
+                bucket_size=window.delta,
+                bucket_limit=limit,
+                filters=filters,
+            )
 
         overview = _build_routes_overview(overview_row)
         buckets = [_build_route_bucket(row, window.delta) for row in bucket_rows]
@@ -112,29 +142,45 @@ class AnalyticsService(A_AnalyticsService):
             buckets=buckets,
         )
 
-        await self._set_cached(
-            cache_key,
-            summary,
-            _routes_summary_to_dict,
-            ttl=self.routes_summary_cache_ttl,
-        )
+        if use_cache:
+            await self._set_cached(
+                cache_key,
+                summary,
+                _routes_summary_to_dict,
+                ttl=self.routes_summary_cache_ttl,
+            )
         return summary
 
     async def get_forwarded_summary(
-        self, *, window: AnalyticsTimeWindow, bucket_limit: int | None = None
+        self,
+        *,
+        window: AnalyticsTimeWindow,
+        bucket_limit: int | None = None,
+        filters: AnalyticsFilters | None = None,
     ) -> ForwardedSummary:
         limit = bucket_limit or self.default_bucket_limit
         cache_key = f"analytics:forwarded:summary:{window.value}:{limit}"
-        cached = await self._get_cached(cache_key, _dict_to_forwarded_summary)
-        if cached is not None:
-            return cached
+        use_cache = _should_use_cache(filters)
+        if use_cache:
+            cached = await self._get_cached(cache_key, _dict_to_forwarded_summary)
+            if cached is not None:
+                return cached
 
         async with self.uow as uow_ctx:
-            overview_row = await uow_ctx.analytics.get_forwarded_overview()
-            bucket_rows = await uow_ctx.analytics.get_forwarded_buckets(bucket_size=window.delta, bucket_limit=limit)
+            overview_row = await uow_ctx.analytics.get_forwarded_overview(filters=filters)
+            bucket_rows = await uow_ctx.analytics.get_forwarded_buckets(
+                bucket_size=window.delta,
+                bucket_limit=limit,
+                filters=filters,
+            )
             totals = await uow_ctx.analytics.get_totals()
+            distribution_rows = await uow_ctx.analytics.get_forwarded_distribution(filters=filters)
 
-        overview = _build_forwarded_overview(overview_row, routes_total=totals["routes_total"])
+        overview = _build_forwarded_overview(
+            overview_row,
+            distribution_rows=distribution_rows,
+            routes_total=totals["routes_total"],
+        )
         buckets = [_build_forwarded_bucket(row, window.delta) for row in bucket_rows]
         summary = ForwardedSummary(
             window=window,
@@ -144,12 +190,13 @@ class AnalyticsService(A_AnalyticsService):
             buckets=buckets,
         )
 
-        await self._set_cached(
-            cache_key,
-            summary,
-            _forwarded_summary_to_dict,
-            ttl=self.forwarded_summary_cache_ttl,
-        )
+        if use_cache:
+            await self._set_cached(
+                cache_key,
+                summary,
+                _forwarded_summary_to_dict,
+                ttl=self.forwarded_summary_cache_ttl,
+            )
         return summary
 
     async def _get_cached(self, key: str, parser: Callable[[dict[str, Any]], T]) -> T | None:
@@ -183,6 +230,12 @@ class AnalyticsService(A_AnalyticsService):
             await self.redis.set(key, payload, ex=ttl)
         except Exception:
             return
+
+
+def _should_use_cache(filters: AnalyticsFilters | None) -> bool:
+    if filters is None:
+        return True
+    return filters.is_empty()
 
 
 def _build_routes_overview(row: RoutesOverviewRow) -> RoutesOverview:
@@ -223,16 +276,34 @@ def _build_route_bucket(row: RouteBucketRow, delta: timedelta) -> RouteBucket:
     )
 
 
-def _build_forwarded_overview(row: ForwardedOverviewRow, *, routes_total: int) -> ForwardedOverview:
+def _build_forwarded_overview(
+    row: ForwardedOverviewRow,
+    *,
+    distribution_rows: Sequence[ForwardedRecipientDistributionRow],
+    routes_total: int,
+) -> ForwardedOverview:
     auto_volume = row.auto_approved + row.auto_rejected
     avg_predictions_per_route = (
         row.total_predictions / row.routes_with_predictions if row.routes_with_predictions else None
     )
-    auto_resolution_ratio = (auto_volume / row.total_predictions) if row.total_predictions else None
     auto_acceptance_rate = row.auto_approved / auto_volume if auto_volume else None
-    manual_backlog_ratio = row.manual_pending / row.total_predictions if row.total_predictions else None
     routes_auto_resolved = max(row.routes_with_predictions - row.routes_manual_pending, 0)
     routes_coverage_ratio = row.routes_with_predictions / routes_total if routes_total else None
+    routes_denominator = row.routes_with_predictions
+    manual_backlog_ratio = row.routes_manual_pending / routes_denominator if routes_denominator else None
+    auto_resolution_ratio = routes_auto_resolved / routes_denominator if routes_denominator else None
+    rejection_ratio = row.routes_with_rejections / routes_denominator if routes_denominator else None
+    distribution_total = sum(item.routes for item in distribution_rows)
+    routes_distribution = [
+        ForwardedRecipientDistribution(
+            recipient_id=item.recipient_id,
+            recipient_name=item.recipient_name,
+            routes=item.routes,
+            percentage=(item.routes / distribution_total) if distribution_total else 0.0,
+        )
+        for item in distribution_rows
+    ]
+    routes_distribution.sort(key=lambda item: item.routes, reverse=True)
     return ForwardedOverview(
         total_predictions=row.total_predictions,
         manual_pending=row.manual_pending,
@@ -247,6 +318,7 @@ def _build_forwarded_overview(row: ForwardedOverviewRow, *, routes_total: int) -
         auto_acceptance_rate=auto_acceptance_rate,
         manual_backlog_ratio=manual_backlog_ratio,
         routes_coverage_ratio=routes_coverage_ratio,
+        rejection_ratio=rejection_ratio,
         distinct_recipients=row.distinct_recipients,
         distinct_senders=row.distinct_senders,
         average_score=row.avg_score,
@@ -255,6 +327,7 @@ def _build_forwarded_overview(row: ForwardedOverviewRow, *, routes_total: int) -
         rejected_average_score=row.rejected_avg_score,
         first_forwarded_at=row.first_forwarded_at,
         last_forwarded_at=row.last_forwarded_at,
+        routes_distribution=routes_distribution,
     )
 
 
@@ -275,6 +348,8 @@ def _serialize_value(value: Any) -> Any:
         if value.tzinfo is None:
             return value.replace(tzinfo=timezone.utc).isoformat()
         return value.isoformat()
+    if isinstance(value, uuid.UUID):
+        return str(value)
     if isinstance(value, Enum):
         return value.value
     raise TypeError(f"Object of type {type(value)!r} is not JSON serializable")
@@ -382,6 +457,7 @@ def _dict_to_forwarded_overview(data: dict[str, Any]) -> ForwardedOverview:
         auto_acceptance_rate=_as_float(data.get("auto_acceptance_rate")),
         manual_backlog_ratio=_as_float(data.get("manual_backlog_ratio")),
         routes_coverage_ratio=_as_float(data.get("routes_coverage_ratio")),
+        rejection_ratio=_as_float(data.get("rejection_ratio")),
         distinct_recipients=int(data["distinct_recipients"]),
         distinct_senders=int(data["distinct_senders"]),
         average_score=_as_float(data.get("average_score")),
@@ -390,6 +466,7 @@ def _dict_to_forwarded_overview(data: dict[str, Any]) -> ForwardedOverview:
         rejected_average_score=_as_float(data.get("rejected_average_score")),
         first_forwarded_at=_parse_datetime(data.get("first_forwarded_at")),
         last_forwarded_at=_parse_datetime(data.get("last_forwarded_at")),
+        routes_distribution=[_dict_to_forwarded_distribution(item) for item in data.get("routes_distribution", [])],
     )
 
 
@@ -402,6 +479,16 @@ def _dict_to_forwarded_bucket(data: dict[str, Any]) -> ForwardedBucket:
         auto_approved=int(data["auto_approved"]),
         auto_rejected=int(data["auto_rejected"]),
         average_score=_as_float(data.get("average_score")),
+    )
+
+
+def _dict_to_forwarded_distribution(data: dict[str, Any]) -> ForwardedRecipientDistribution:
+    recipient_id = data.get("recipient_id")
+    return ForwardedRecipientDistribution(
+        recipient_id=uuid.UUID(str(recipient_id)) if recipient_id is not None else None,
+        recipient_name=data.get("recipient_name"),
+        routes=int(data["routes"]),
+        percentage=float(data.get("percentage", 0.0)),
     )
 
 

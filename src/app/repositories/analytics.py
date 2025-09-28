@@ -1,7 +1,7 @@
 import abc
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Sequence
+from typing import Any, Sequence
 
 from sqlalchemy.ext.asyncio.session import AsyncSession
 from sqlalchemy.sql.elements import literal
@@ -10,10 +10,12 @@ from sqlalchemy.sql.functions import func
 
 from app.models import (
     Agent,
+    AnalyticsFilters,
     Document,
     Forwarded,
     ForwardedBucketRow,
     ForwardedOverviewRow,
+    ForwardedRecipientDistributionRow,
     ProcessStatus,
     Route,
     RouteBucketRow,
@@ -31,23 +33,45 @@ class A_AnalyticsRepository(ARepository[None, None], abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def get_routes_overview(self) -> RoutesOverviewRow:
+    async def get_routes_overview(self, *, filters: AnalyticsFilters | None = None) -> RoutesOverviewRow:
         raise NotImplementedError
 
     @abc.abstractmethod
     async def get_route_buckets(
-        self, *, bucket_size: timedelta, bucket_limit: int, now: datetime | None = None
+        self,
+        *,
+        bucket_size: timedelta,
+        bucket_limit: int,
+        now: datetime | None = None,
+        filters: AnalyticsFilters | None = None,
     ) -> Sequence[RouteBucketRow]:
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def get_forwarded_overview(self) -> ForwardedOverviewRow:
+    async def get_forwarded_overview(
+        self,
+        *,
+        filters: AnalyticsFilters | None = None,
+    ) -> ForwardedOverviewRow:
         raise NotImplementedError
 
     @abc.abstractmethod
     async def get_forwarded_buckets(
-        self, *, bucket_size: timedelta, bucket_limit: int, now: datetime | None = None
+        self,
+        *,
+        bucket_size: timedelta,
+        bucket_limit: int,
+        now: datetime | None = None,
+        filters: AnalyticsFilters | None = None,
     ) -> Sequence[ForwardedBucketRow]:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    async def get_forwarded_distribution(
+        self,
+        *,
+        filters: AnalyticsFilters | None = None,
+    ) -> Sequence[ForwardedRecipientDistributionRow]:
         raise NotImplementedError
 
 
@@ -74,7 +98,7 @@ class AnalyticsRepository(A_AnalyticsRepository):
             "routes_total": int(row.routes_total),
         }
 
-    async def get_routes_overview(self) -> RoutesOverviewRow:
+    async def get_routes_overview(self, *, filters: AnalyticsFilters | None = None) -> RoutesOverviewRow:
         duration_seconds = func.extract("epoch", Route.completed_at - Route.started_at)
         queue_seconds = func.extract("epoch", Route.started_at - Route.created_at)
         in_progress_age = func.extract("epoch", func.now() - Route.started_at)
@@ -97,6 +121,8 @@ class AnalyticsRepository(A_AnalyticsRepository):
             func.avg(case((Route.status == ProcessStatus.IN_PROGRESS, in_progress_age), else_=None)),
             func.avg(case((Route.status == ProcessStatus.PENDING, pending_age), else_=None)),
         )
+
+        stmt = self._apply_route_filters(stmt, filters)
 
         result = await self.session.execute(stmt)
         (
@@ -132,7 +158,12 @@ class AnalyticsRepository(A_AnalyticsRepository):
         )
 
     async def get_route_buckets(
-        self, *, bucket_size: timedelta, bucket_limit: int, now: datetime | None = None
+        self,
+        *,
+        bucket_size: timedelta,
+        bucket_limit: int,
+        now: datetime | None = None,
+        filters: AnalyticsFilters | None = None,
     ) -> Sequence[RouteBucketRow]:
         if bucket_limit <= 0:
             return []
@@ -159,6 +190,8 @@ class AnalyticsRepository(A_AnalyticsRepository):
         join_condition = (Route.created_at >= series_cte.c.bucket_start) & (
             Route.created_at < series_cte.c.bucket_start + text(f"interval '{step_seconds} seconds'")
         )
+        for clause in self._build_route_join_filters(filters):
+            join_condition = join_condition & clause
 
         stmt = (
             select(
@@ -206,7 +239,11 @@ class AnalyticsRepository(A_AnalyticsRepository):
             )
         return rows
 
-    async def get_forwarded_overview(self) -> ForwardedOverviewRow:
+    async def get_forwarded_overview(
+        self,
+        *,
+        filters: AnalyticsFilters | None = None,
+    ) -> ForwardedOverviewRow:
         stmt = select(
             func.count(Forwarded.id),
             func.count(Forwarded.id).filter(Forwarded.is_valid.is_(None)),
@@ -224,6 +261,8 @@ class AnalyticsRepository(A_AnalyticsRepository):
             func.min(Forwarded.created_at),
             func.max(Forwarded.created_at),
         ).where(Forwarded.route_id.is_not(None))
+
+        stmt = self._apply_forwarded_filters(stmt, filters)
 
         result = await self.session.execute(stmt)
         (
@@ -263,7 +302,12 @@ class AnalyticsRepository(A_AnalyticsRepository):
         )
 
     async def get_forwarded_buckets(
-        self, *, bucket_size: timedelta, bucket_limit: int, now: datetime | None = None
+        self,
+        *,
+        bucket_size: timedelta,
+        bucket_limit: int,
+        now: datetime | None = None,
+        filters: AnalyticsFilters | None = None,
     ) -> Sequence[ForwardedBucketRow]:
         if bucket_limit <= 0:
             return []
@@ -287,6 +331,8 @@ class AnalyticsRepository(A_AnalyticsRepository):
         join_condition = (Forwarded.created_at >= series_cte.c.bucket_start) & (
             Forwarded.created_at < series_cte.c.bucket_start + text(f"interval '{step_seconds} seconds'")
         )
+        for clause in self._build_forwarded_join_filters(filters):
+            join_condition = join_condition & clause
 
         stmt = (
             select(
@@ -325,6 +371,85 @@ class AnalyticsRepository(A_AnalyticsRepository):
             )
 
         return rows
+
+    async def get_forwarded_distribution(
+        self,
+        *,
+        filters: AnalyticsFilters | None = None,
+    ) -> Sequence[ForwardedRecipientDistributionRow]:
+        stmt = (
+            select(
+                Forwarded.recipient_id,
+                Agent.name,
+                func.count(func.distinct(Forwarded.route_id)),
+            )
+            .join(Agent, Agent.id == Forwarded.recipient_id, isouter=True)
+            .where(Forwarded.route_id.is_not(None))
+            .group_by(Forwarded.recipient_id, Agent.name)
+            .order_by(func.count(func.distinct(Forwarded.route_id)).desc())
+        )
+        stmt = self._apply_forwarded_filters(stmt, filters)
+
+        result = await self.session.execute(stmt)
+        rows: list[ForwardedRecipientDistributionRow] = []
+        for recipient_id, recipient_name, routes in result.all():
+            rows.append(
+                ForwardedRecipientDistributionRow(
+                    recipient_id=recipient_id,
+                    recipient_name=recipient_name,
+                    routes=int(routes or 0),
+                )
+            )
+        return rows
+
+    def _apply_route_filters(self, stmt: Any, filters: AnalyticsFilters | None) -> Any:
+        for clause in self._build_route_filters(filters):
+            stmt = stmt.where(clause)
+        return stmt
+
+    def _build_route_join_filters(self, filters: AnalyticsFilters | None) -> list[Any]:
+        return self._build_route_filters(filters)
+
+    def _build_route_filters(self, filters: AnalyticsFilters | None) -> list[Any]:
+        if filters is None or filters.is_empty():
+            return []
+        clauses = []
+        if filters.time_from:
+            clauses.append(Route.created_at >= filters.time_from)
+        if filters.time_to:
+            clauses.append(Route.created_at < filters.time_to)
+        if filters.sender_id:
+            clauses.append(Route.sender_id == filters.sender_id)
+        if filters.recipient_id:
+            subquery = (
+                select(Forwarded.route_id)
+                .where(Forwarded.recipient_id == filters.recipient_id)
+                .where(Forwarded.route_id.is_not(None))
+            )
+            clauses.append(Route.id.in_(subquery))
+        return clauses
+
+    def _apply_forwarded_filters(self, stmt: Any, filters: AnalyticsFilters | None) -> Any:
+        for clause in self._build_forwarded_filters(filters):
+            stmt = stmt.where(clause)
+        return stmt
+
+    def _build_forwarded_join_filters(self, filters: AnalyticsFilters | None) -> list[Any]:
+        return self._build_forwarded_filters(filters)
+
+    def _build_forwarded_filters(self, filters: AnalyticsFilters | None) -> list[Any]:
+        if filters is None or filters.is_empty():
+            return []
+        clauses = []
+        if filters.time_from:
+            clauses.append(Forwarded.created_at >= filters.time_from)
+        if filters.time_to:
+            clauses.append(Forwarded.created_at < filters.time_to)
+        if filters.sender_id:
+            clauses.append(Forwarded.sender_id == filters.sender_id)
+        if filters.recipient_id:
+            clauses.append(Forwarded.recipient_id == filters.recipient_id)
+        return clauses
 
     @staticmethod
     def _as_float(value: Decimal | float | None) -> float | None:

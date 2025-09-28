@@ -64,6 +64,7 @@ class RoutesService(ARoutesService):
         retriever_distance_metric: Literal["cosine", "l2", "inner"],
         retriever_aggregation_method: Literal["mean", "max", "top_k_mean"],
         candidate_score_threshold: float,
+        forwarded_limit: int,
         uow: AUnitOfWork,
         summarizer: ATextSummarizer,
         retriever: ARetrieverService,
@@ -77,6 +78,7 @@ class RoutesService(ARoutesService):
         self.retriever_distance_metric = retriever_distance_metric
         self.retriever_aggregation_method = retriever_aggregation_method
         self.candidate_score_threshold = candidate_score_threshold
+        self.forwarded_limit = forwarded_limit
         self.uow = uow
         self.retriever = retriever
         self.documents_service = documents_service
@@ -153,7 +155,7 @@ class RoutesService(ARoutesService):
                         is_valid=None,
                         score=fallback_score,
                     )
-                    for agent in default_recipients
+                    for agent in default_recipients[: self.forwarded_limit]
                 ]
                 async with self.uow as uow_ctx:
                     await uow_ctx.forwarded.add_many(predicted_forwards)
@@ -203,19 +205,20 @@ class RoutesService(ARoutesService):
 
             # ----- Build forwarded -----
 
-            predicted_forwards = []
-            for potential_recipient in potential_recipients.values():
-                if potential_recipient.is_eligible:
-                    predicted_forwarded = Forwarded(
-                        purpose=None,
-                        sender_id=route.sender_id,
-                        recipient_id=potential_recipient.agent_id,
-                        document_id=route.document_id,
-                        route_id=route.id,
-                        is_valid=None if potential_recipient.is_eligible else False,
-                        score=potential_recipient.score,
-                    )
-                    predicted_forwards.append(predicted_forwarded)
+            eligible_recipients = [recipient for recipient in potential_recipients.values() if recipient.is_eligible]
+            eligible_recipients.sort(key=lambda recipient: recipient.score, reverse=True)
+            predicted_forwards = [
+                Forwarded(
+                    purpose=None,
+                    sender_id=route.sender_id,
+                    recipient_id=recipient.agent_id,
+                    document_id=route.document_id,
+                    route_id=route.id,
+                    is_valid=None,
+                    score=recipient.score,
+                )
+                for recipient in eligible_recipients[: self.forwarded_limit]
+            ]
 
             async with self.uow as uow_ctx:
                 await uow_ctx.forwarded.add_many(predicted_forwards)

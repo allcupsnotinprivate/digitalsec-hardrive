@@ -27,6 +27,7 @@ class RouterSettings(BaseModel):
     investigation_timeout: float = Field(default=300, gt=5)
     candidate_score_threshold: float = Field(default=0.6, ge=0.0, lt=1.0)
     investigation_parallelism: int = Field(default=4, ge=1)
+    forwarded_limit: int = Field(default=1, ge=1)
 
 
 class DocumentsAdmissionSettings(BaseModel):

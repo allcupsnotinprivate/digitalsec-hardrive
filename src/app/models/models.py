@@ -1,5 +1,5 @@
 import uuid
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
@@ -206,6 +206,7 @@ class ForwardedOverview:
     auto_acceptance_rate: float | None = None
     manual_backlog_ratio: float | None = None
     routes_coverage_ratio: float | None = None
+    rejection_ratio: float | None = None
     distinct_recipients: int = 0
     distinct_senders: int = 0
     average_score: float | None = None
@@ -214,6 +215,7 @@ class ForwardedOverview:
     rejected_average_score: float | None = None
     first_forwarded_at: datetime | None = None
     last_forwarded_at: datetime | None = None
+    routes_distribution: list["ForwardedRecipientDistribution"] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -234,6 +236,32 @@ class ForwardedSummary:
     bucket_limit: int
     overview: ForwardedOverview
     buckets: list[ForwardedBucket]
+
+
+@dataclass(slots=True)
+class ForwardedRecipientDistributionRow:
+    recipient_id: uuid.UUID | None
+    recipient_name: str | None
+    routes: int
+
+
+@dataclass(slots=True)
+class ForwardedRecipientDistribution:
+    recipient_id: uuid.UUID | None
+    recipient_name: str | None
+    routes: int
+    percentage: float
+
+
+@dataclass(slots=True)
+class AnalyticsFilters:
+    time_from: datetime | None = None
+    time_to: datetime | None = None
+    sender_id: uuid.UUID | None = None
+    recipient_id: uuid.UUID | None = None
+
+    def is_empty(self) -> bool:
+        return not any((self.time_from, self.time_to, self.sender_id, self.recipient_id))
 
 
 @dataclass(slots=True)

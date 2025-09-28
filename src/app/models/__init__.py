@@ -1,6 +1,7 @@
 from .enums import AnalyticsTimeWindow, ProcessStatus
 from .models import (
     Agent,
+    AnalyticsFilters,
     AnalyticsOverview,
     Base,
     Document,
@@ -10,6 +11,8 @@ from .models import (
     ForwardedBucketRow,
     ForwardedOverview,
     ForwardedOverviewRow,
+    ForwardedRecipientDistribution,
+    ForwardedRecipientDistributionRow,
     ForwardedSummary,
     InventorySummary,
     Route,
@@ -48,4 +51,7 @@ __all__ = [
     "ForwardedOverviewRow",
     "ForwardedBucketRow",
     "AnalyticsOverview",
+    "ForwardedRecipientDistribution",
+    "ForwardedRecipientDistributionRow",
+    "AnalyticsFilters",
 ]

@@ -53,12 +53,14 @@ async def register_agent(data: AgentIn, agents_service: Injected[A_AgentsService
 @inject
 async def search_agents(
     pagination: PaginationParams = Depends(),
+    ids: list[UUID] | None = Query(default=None),
     filters: AgentSearchFilters = Depends(),
     agents_service: Injected[A_AgentsService] = Depends(),
 ) -> AgentSearchResponse:
     agents, total = await agents_service.search(
         page=pagination.page,
         page_size=pagination.page_size,
+        ids=ids,
         name=filters.name,
         description=filters.description,
         is_active=filters.is_active,

@@ -78,6 +78,7 @@ class RoutesServiceWrapper(service_layer.RoutesService):
             retriever_distance_metric=router.retriever_distance_metric,
             retriever_aggregation_method=router.retriever_aggregation_method,
             candidate_score_threshold=router.candidate_score_threshold,
+            forwarded_limit=router.forwarded_limit,
             uow=uow,
             summarizer=summarizer,
             retriever=retriever,

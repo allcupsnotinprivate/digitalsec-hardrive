@@ -1,6 +1,7 @@
 from datetime import datetime
+from uuid import UUID
 
-from pydantic import ConfigDict
+from pydantic import ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from app.models import AnalyticsTimeWindow
@@ -60,6 +61,13 @@ class RoutesSummaryResponse(AnalyticsAPISchema):
     buckets: list[RouteBucketResponse]
 
 
+class ForwardedRecipientDistributionResponse(AnalyticsAPISchema):
+    recipient_id: UUID | None = None
+    recipient_name: str | None = None
+    routes: int
+    percentage: float
+
+
 class ForwardedOverviewResponse(AnalyticsAPISchema):
     total_predictions: int
     manual_pending: int
@@ -74,6 +82,7 @@ class ForwardedOverviewResponse(AnalyticsAPISchema):
     auto_acceptance_rate: float | None = None
     manual_backlog_ratio: float | None = None
     routes_coverage_ratio: float | None = None
+    rejection_ratio: float | None = None
     distinct_recipients: int
     distinct_senders: int
     average_score: float | None = None
@@ -82,6 +91,7 @@ class ForwardedOverviewResponse(AnalyticsAPISchema):
     rejected_average_score: float | None = None
     first_forwarded_at: datetime | None = None
     last_forwarded_at: datetime | None = None
+    routes_distribution: list[ForwardedRecipientDistributionResponse] = Field(default_factory=list)
 
 
 class ForwardedBucketResponse(AnalyticsAPISchema):

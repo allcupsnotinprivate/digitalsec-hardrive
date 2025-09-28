@@ -33,6 +33,7 @@ class A_AgentsRepository(ARepository[Agent, UUID], abc.ABC):
         page: int,
         page_size: int,
         name: str | None,
+        ids: list[UUID] | None,
         description: str | None,
         is_active: bool | None,
         is_default_recipient: bool | None,
@@ -98,6 +99,7 @@ class AgentsRepository(A_AgentsRepository):
         page: int,
         page_size: int,
         name: str | None,
+        ids: list[UUID] | None,
         description: str | None,
         is_active: bool | None,
         is_default_recipient: bool | None,
@@ -109,6 +111,8 @@ class AgentsRepository(A_AgentsRepository):
             filters.append(self.model_class.description.ilike(f"%{description}%"))
         if is_active is not None:
             filters.append(self.model_class.is_active.is_(is_active))
+        if ids:
+            filters.append(self.model_class.id.in_(ids))
         if is_default_recipient is not None:
             filters.append(self.model_class.is_default_recipient.is_(is_default_recipient))
 
