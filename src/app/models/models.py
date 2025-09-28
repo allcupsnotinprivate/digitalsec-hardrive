@@ -1,10 +1,11 @@
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import BOOLEAN, FLOAT, TIMESTAMP, VARCHAR, CheckConstraint, ForeignKey
-from sqlalchemy.dialects.postgresql import BYTEA, ENUM, UUID
+from sqlalchemy.dialects.postgresql import BIGINT, BYTEA, ENUM, JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from app.utils.timestamps import now_with_tz
@@ -35,6 +36,13 @@ class Document(Base):
     __tablename__ = "documents"
 
     name: Mapped[str] = mapped_column(VARCHAR(124), nullable=True)
+    # s3
+    storage_bucket: Mapped[str] = mapped_column(VARCHAR(63), nullable=False)
+    storage_key: Mapped[str] = mapped_column(VARCHAR(512), nullable=False, unique=True)
+    content_type: Mapped[str | None] = mapped_column(VARCHAR(255), nullable=True)
+    file_size: Mapped[int] = mapped_column(BIGINT, nullable=False, default=0)
+    original_filename: Mapped[str | None] = mapped_column(VARCHAR(255), nullable=True)
+    storage_metadata: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
 
     chunks: Mapped[list["DocumentChunk"]] = relationship(
         back_populates="document", cascade="all, delete-orphan", lazy="selectin"

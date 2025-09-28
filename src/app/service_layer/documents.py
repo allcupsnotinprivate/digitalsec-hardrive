@@ -1,15 +1,17 @@
 import abc
+import mimetypes
 from datetime import datetime
-from typing import Sequence, TypedDict
-from uuid import UUID
+from typing import Mapping, Sequence, TypedDict
+from uuid import UUID, uuid4
 
 import numpy as np
 from loguru import logger
 
 from app.exceptions import BusinessLogicError, NotFoundError
-from app.infrastructure import ATextSegmenter, ATextVectorizer
+from app.infrastructure import AS3Client, ATextSegmenter, ATextVectorizer
 from app.models import Document, DocumentChunk, Forwarded
 from app.utils.cleaners import ATextCleaner
+from app.utils.files import sanitize_filename
 from app.utils.hash import create_sha256_hash
 
 from .aClasses import AService
@@ -24,7 +26,16 @@ class ForwardedUpdateData(TypedDict, total=False):
 
 class ADocumentsService(AService, abc.ABC):
     @abc.abstractmethod
-    async def admit(self, name: str, content: str) -> Document:
+    async def admit(
+            self,
+            name: str,
+            *,
+            text_content: str | None = None,
+            file_bytes: bytes | None = None,
+            content_type: str | None = None,
+            original_filename: str | None = None,
+            metadata: Mapping[str, str] | None = None,
+    ) -> Document:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -33,6 +44,14 @@ class ADocumentsService(AService, abc.ABC):
 
     @abc.abstractmethod
     async def extract_document_content(self, document_id: UUID) -> str:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    async def build_download_url(self, document: Document, *, expires_in: int | None = None) -> str:
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    async def get_download_url(self, document_id: UUID, *, expires_in: int | None = None) -> str:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -98,20 +117,92 @@ class ADocumentsService(AService, abc.ABC):
 
 class DocumentsService(ADocumentsService):
     def __init__(
-        self, uow: AUnitOfWork, segmenter: ATextSegmenter, vectorizer: ATextVectorizer, text_cleaner: ATextCleaner
+        self,
+            uow: AUnitOfWork,
+            segmenter: ATextSegmenter,
+            vectorizer: ATextVectorizer,
+            text_cleaner: ATextCleaner,
+            storage_client: AS3Client,
+            storage_bucket: str,
+            presigned_url_ttl: int,
     ):
         self.uow = uow
         self.segmenter = segmenter
         self.vectorizer = vectorizer
         self.text_cleaner = text_cleaner
+        self.storage_client = storage_client
+        self.storage_bucket = storage_bucket
+        self.presigned_url_ttl = presigned_url_ttl
+        self._bucket_initialized = False
 
-    async def admit(self, name: str, content: str) -> Document:
-        clean_content = self.text_cleaner.clean(content)
-        logger.debug("Text cleared", original_size=len(content), final_size=len(clean_content))
+    async def admit(
+            self,
+            name: str,
+            *,
+            text_content: str | None = None,
+            file_bytes: bytes | None = None,
+            content_type: str | None = None,
+            original_filename: str | None = None,
+            metadata: Mapping[str, str] | None = None,
+    ) -> Document:
+        if (text_content is None and file_bytes is None) or (text_content is not None and file_bytes is not None):
+            raise BusinessLogicError("Provide either raw text or a document file for admission, not both.")
+
+        await self._ensure_bucket()
+
+        metadata_payload: dict[str, str] = dict(metadata or {})
+        metadata_payload.setdefault("document_name", name)
+
+        if file_bytes is None:
+            assert text_content is not None  # for type-checkers
+            if not text_content.strip():
+                raise BusinessLogicError("Document content must not be empty.")
+
+            normalized_filename = sanitize_filename(name, ".txt")
+            original_name = normalized_filename
+            bytes_payload = text_content.encode("utf-8")
+            resolved_content_type = content_type or "text/plain; charset=utf-8"
+            raw_content = text_content
+            metadata_payload.setdefault("source", "text")
+        else:
+            normalized_filename = sanitize_filename(original_filename or name)
+            original_name = original_filename or normalized_filename
+            bytes_payload = file_bytes
+            guessed_type, _ = mimetypes.guess_type(normalized_filename)
+            resolved_content_type = content_type or guessed_type or "application/octet-stream"
+            raw_content = file_bytes.decode("utf-8", errors="ignore")
+            metadata_payload.setdefault("source", "file")
+
+        metadata_payload.setdefault("original_filename", original_name)
+
+        clean_content = self.text_cleaner.clean(raw_content)
+        logger.debug("Text cleared", original_size=len(raw_content), final_size=len(clean_content))
 
         content_chunks = await self.segmenter.chunk(clean_content)
+
+        document_id = uuid4()
+        metadata_payload.setdefault("document_id", str(document_id))
+        storage_key = f"documents/{document_id}/{normalized_filename}"
+
+        await self.storage_client.upload(
+            bucket=self.storage_bucket,
+            key=storage_key,
+            body=bytes_payload,
+            content_type=resolved_content_type,
+            metadata=metadata_payload,
+        )
+
         async with self.uow as uow_ctx:
-            document = Document(name=name)
+            document = Document(
+                id=document_id,
+                name=name,
+                storage_bucket=self.storage_bucket,
+                storage_key=storage_key,
+                content_type=resolved_content_type,
+                file_size=len(bytes_payload),
+                original_filename=original_name,
+                storage_metadata=metadata_payload or None,
+            )
             await uow_ctx.documents.add(document)
 
             previous_chunk_id = None
@@ -134,9 +225,36 @@ class DocumentsService(ADocumentsService):
                 await uow_ctx.document_chunks.add(document_chunk)
                 previous_chunk_id = document_chunk.id
 
-        logger.debug("Document admitted", document_id=document.id, chunks=len(content_chunks))
+        logger.debug(
+            "Document admitted",
+            document_id=document.id,
+            chunks=len(content_chunks),
+            storage_key=storage_key,
+        )
 
         return document
+
+    async def build_download_url(self, document: Document, *, expires_in: int | None = None) -> str:
+        if not document.storage_key or not document.storage_bucket:
+            raise BusinessLogicError("Document storage metadata is not available.")
+
+        await self._ensure_bucket()
+        ttl = expires_in or self.presigned_url_ttl
+        return await self.storage_client.generate_presigned_url(
+            bucket=document.storage_bucket,
+            key=document.storage_key,
+            expires_in=ttl,
+        )
+
+    async def get_download_url(self, document_id: UUID, *, expires_in: int | None = None) -> str:
+        document = await self.retrieve(document_id)
+        return await self.build_download_url(document, expires_in=expires_in)
+
+    async def _ensure_bucket(self) -> None:
+        if self._bucket_initialized:
+            return
+        await self.storage_client.ensure_bucket(self.storage_bucket)
+        self._bucket_initialized = True
 
     async def retrieve(self, id: UUID) -> Document:
         async with self.uow as uow_ctx:

@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field, computed_field
 
 
@@ -42,9 +44,28 @@ class RabbitMQSettings(BaseModel):
         return f"amqp://{self.user}:{self.password}@{domain}/"
 
 
+class S3Settings(BaseModel):
+    host: str = Field(default="0.0.0.0")
+    port: int | None = Field(default=9000)
+    region: str = Field(default="us-east-1")
+    access_key: str = Field(default="digitalsec")
+    secret_key: str = Field(default="digitalsec_password")
+    bucket: str = Field(default="digitalsec-documents")
+    use_ssl: bool = Field(default=False)
+    scheme: Literal["http", "https"] = Field(default="http")
+
+    @computed_field()
+    def endpoint_url(self) -> str:
+        url = f"{self.scheme}://{self.host}"
+        if self.port:
+            url += f":{self.port}"
+        return url
+
+
 class ExternalSettings(BaseModel):
     postgres: PostgresSettings = Field(default_factory=PostgresSettings)
     summarizer: SummarizerSettings = Field(default_factory=SummarizerSettings)
     vectorizer: VectorizerSettings = Field(default_factory=VectorizerSettings)
     redis: RedisSettings = Field(default_factory=RedisSettings)
     rabbitmq: RabbitMQSettings = Field(default_factory=RabbitMQSettings)
+    s3: S3Settings = Field(default_factory=S3Settings)

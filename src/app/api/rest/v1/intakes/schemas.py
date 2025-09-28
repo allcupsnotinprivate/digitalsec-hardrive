@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import AnyUrl, Field
 
 from app.api.rest.schemas import PageMeta
 from app.models import ProcessStatus
@@ -11,11 +11,16 @@ from app.utils.schemas import BaseAPISchema
 
 class DocumentIn(BaseAPISchema):
     name: str = Field(default_factory=create_document_name)
-    content: str = Field()
+    content: str | None = Field(default=None)
 
 
 class DocumentOut(BaseAPISchema):
     id: UUID = Field()
+    name: str | None = Field(default=None)
+    original_filename: str | None = Field(default=None)
+    content_type: str | None = Field(default=None)
+    file_size: int = Field(default=0)
+    download_url: AnyUrl = Field()
 
 
 class DocumentSearchFilters(BaseAPISchema):
@@ -27,6 +32,10 @@ class DocumentSearchFilters(BaseAPISchema):
 class DocumentRead(BaseAPISchema):
     id: UUID = Field()
     name: str | None = Field(default=None)
+    original_filename: str | None = Field(default=None)
+    content_type: str | None = Field(default=None)
+    file_size: int = Field(default=0)
+    download_url: AnyUrl = Field()
     created_at: datetime = Field()
 
 

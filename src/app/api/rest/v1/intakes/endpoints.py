@@ -4,11 +4,13 @@ from uuid import UUID
 
 from aioinject import Injected
 from aioinject.ext.fastapi import inject
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 
 from app.api.rest.schemas import PaginationParams, build_page_info
+from app.models import Document
 from app.service_layer import A_AgentsService, ADocumentsService, ARoutesService
 from app.service_layer.documents import ForwardedUpdateData
+from app.utils.hash import create_document_name
 
 from .schemas import (
     AgentIn,
@@ -85,9 +87,49 @@ async def search_agents(
 
 @router.post("/documents/admit", status_code=201, response_model=DocumentOut)
 @inject
-async def admit_document(data: DocumentIn, documents_service: Injected[ADocumentsService] = Depends()) -> DocumentOut:
-    document = await documents_service.admit(name=data.name, content=data.content)
-    return DocumentOut(id=document.id)
+async def admit_document(
+    file: UploadFile | None = File(None),
+    content: str | None = Form(None),
+    name: str | None = Form(None),
+    documents_service: Injected[ADocumentsService] = Depends()
+) -> DocumentOut:
+    if file and content:
+        raise HTTPException(400, "Provide either a file or plain text, not both.")
+
+    if file:
+        file_bytes = await file.read()
+        if not file_bytes:
+            raise HTTPException(400, "Uploaded file is empty.")
+
+        resolved_name = name or (file.filename if file.filename else create_document_name())
+
+        document = await documents_service.admit(
+            name=resolved_name,
+            file_bytes=file_bytes,
+            content_type=file.content_type,
+            original_filename=file.filename,
+        )
+    elif content:
+        if not content.strip():
+            raise HTTPException(400, "Document content must not be empty.")
+
+        resolved_name = name or create_document_name()
+        document = await documents_service.admit(
+            name=resolved_name,
+            text_content=content,
+        )
+    else:
+        raise HTTPException(400, "No document payload provided.")
+
+    download_url = await documents_service.build_download_url(document)
+    return DocumentOut(
+        id=document.id,
+        name=document.name,
+        original_filename=document.original_filename,
+        content_type=document.content_type,
+        file_size=document.file_size,
+        download_url=download_url,
+    )
 
 
 @router.get("/documents/search", response_model=DocumentSearchResponse, status_code=200)
@@ -105,10 +147,23 @@ async def search_documents(
         created_to=filters.created_to,
     )
 
+    items: list[DocumentRead] = []
+    for document in documents:
+        download_url = await documents_service.build_download_url(document)
+        items.append(
+            DocumentRead(
+                id=document.id,
+                name=document.name,
+                original_filename=document.original_filename,
+                content_type=document.content_type,
+                file_size=document.file_size,
+                download_url=download_url,
+                created_at=document.created_at,
+            )
+        )
+
     return DocumentSearchResponse(
-        items=[
-            DocumentRead(id=document.id, name=document.name, created_at=document.created_at) for document in documents
-        ],
+        items=items,
         pageInfo=build_page_info(total=total, page=pagination.page, page_size=pagination.page_size),
     )
 

@@ -1,7 +1,7 @@
 from app import infrastructure, service_layer
 from app.configs import Settings
 from app.container.keys import RedisCache
-from app.utils.cleaners import BasicDocumentCleaner
+from app.utils.cleaners import BasicDocumentCleaner, ATextCleaner
 
 
 class PostgresDatabaseWrapper(infrastructure.PostgresDatabase):
@@ -114,3 +114,37 @@ class BasicDocumentCleanerWrapper(BasicDocumentCleaner):
 class RabbitMQWrapper(infrastructure.RabbitMQ):
     def __init__(self, settings: Settings):
         super().__init__(settings.external.rabbitmq.url)  # type: ignore[arg-type]
+
+
+class S3MinioClientWrapper(infrastructure.S3MinioClient):
+    def __init__(self, settings: Settings):
+        s3 = settings.external.s3
+        super().__init__(
+            endpoint_url=s3.endpoint_url,
+            region=s3.region,
+            access_key=s3.access_key,
+            secret_key=s3.secret_key,
+            use_ssl=s3.use_ssl,
+        )
+
+
+class DocumentsServiceWrapper(service_layer.DocumentsService):
+    def __init__(
+        self,
+        settings: Settings,
+        uow: service_layer.AUnitOfWork,
+        segmenter: infrastructure.ATextSegmenter,
+        vectorizer: infrastructure.ATextVectorizer,
+        text_cleaner: ATextCleaner,
+        storage_client: infrastructure.AS3Client,
+    ):
+        docs_settings = settings.internal.documents
+        super().__init__(
+            uow=uow,
+            segmenter=segmenter,
+            vectorizer=vectorizer,
+            text_cleaner=text_cleaner,
+            storage_client=storage_client,
+            storage_bucket=settings.external.s3.bucket,
+            presigned_url_ttl=docs_settings.presigned_url_ttl,
+        )

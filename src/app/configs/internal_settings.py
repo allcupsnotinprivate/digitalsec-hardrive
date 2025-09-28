@@ -32,6 +32,7 @@ class RouterSettings(BaseModel):
 
 class DocumentsAdmissionSettings(BaseModel):
     loading_parallelism: int = Field(default=2, ge=1)
+    presigned_url_ttl: int = Field(default=900, ge=60)
 
 
 class AnalyticsSettings(BaseModel):

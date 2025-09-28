@@ -20,4 +20,4 @@ RUN uv pip install --no-cache --system -r requirements.lock
 ENV PYTHONPATH=/src
 # Run the application
 # Note: adjust the path if main.py is nested under src/service_a
-CMD python src/app/main.py
+CMD python src/app/main.py --host 0.0.0.0

@@ -18,7 +18,7 @@ from .wrappers import (
     RoutesServiceWrapper,
     SemanticTextSegmenterWrapper,
     TextSummarizerWrapper,
-    TextVectorizerWrapper,
+    TextVectorizerWrapper, S3MinioClientWrapper, DocumentsServiceWrapper,
 )
 
 # Container & settings
@@ -51,13 +51,14 @@ container.register(
     aioinject.Singleton(TextSummarizerWrapper, infrastructure.ATextSummarizer),
     aioinject.Singleton(RedisClientWrapper, infrastructure.ARedisClient),
     aioinject.Singleton(RabbitMQWrapper, infrastructure.ARabbitMQ),
+    aioinject.Singleton(S3MinioClientWrapper, infrastructure.AS3Client),
 )
 
 # service layer
 container.register(
     aioinject.Transient(service_layer.UnitOfWork, service_layer.AUnitOfWork),
     aioinject.Transient(service_layer.AgentsService, service_layer.A_AgentsService),
-    aioinject.Transient(service_layer.DocumentsService, service_layer.ADocumentsService),
+    aioinject.Transient(DocumentsServiceWrapper, service_layer.ADocumentsService),
     aioinject.Transient(RetrieverServiceWrapper, service_layer.ARetrieverService),
     aioinject.Transient(RoutesServiceWrapper, service_layer.ARoutesService),
     aioinject.Transient(service_layer.CandidateEvaluator, service_layer.ACandidateEvaluator),

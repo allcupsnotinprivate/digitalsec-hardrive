@@ -9,6 +9,7 @@ services:
     depends_on:
       - database
       - redis
+      - s3
     container_name: router_service
     restart: on-failure
     deploy:
@@ -19,51 +20,9 @@ services:
     environment:
       - DIGITALSEC__EXTERNAL__POSTGRES__HOST=database
       - DIGITALSEC__EXTERNAL__REDIS__HOST=redis
-
-  celery-worker:
-    build:
-      context: ../
-      dockerfile: deployment/Dockerfile
-    depends_on:
-      - database
-      - redis
-    container_name: celery_worker
-    restart: on-failure
-    deploy:
-      resources:
-        limits:
-          cpus: '2.0'
-          memory: 2G
-    command: >
-      bash -lc "
-      celery -A app.worker.celery_app worker
-        --loglevel=info
-        --concurrency=2
-        --prefetch-multiplier=1
-        --max-tasks-per-child=100
-      "
-    environment:
-      - DIGITALSEC__EXTERNAL__POSTGRES__HOST=database
-      - DIGITALSEC__EXTERNAL__REDIS__HOST=redis
-
-  celery-beat:
-    build:
-      context: ../
-      dockerfile: deployment/Dockerfile
-    depends_on:
-      - database
-      - redis
-    container_name: celery_beat
-    restart: on-failure
-    deploy:
-      resources:
-        limits:
-          cpus: '0.25'
-          memory: 256M
-    command: celery -A app.worker.celery_app beat --loglevel=info
-    environment:
-      - DIGITALSEC__EXTERNAL__POSTGRES__HOST=database
-      - DIGITALSEC__EXTERNAL__REDIS__HOST=redis
+      - DIGITALSEC__EXTERNAL__S3__HOST=s3
+    env_file:
+      - ../.dev.env
 
   database:
     image: pgvector/pgvector:pg17
@@ -109,8 +68,24 @@ services:
     volumes:
       - redis_data:/data
 
+  s3:
+    image: minio/minio:RELEASE.2025-07-23T15-54-02Z-cpuv1
+    container_name: s3
+    restart: on-failure
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=digitalsec
+      - MINIO_ROOT_PASSWORD=digitalsec_password
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - s3_data:/data
+
 volumes:
   database_data:
     driver: local
   redis_data:
+    driver: local
+  s3_data:
     driver: local
