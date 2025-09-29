@@ -27,14 +27,14 @@ class ForwardedUpdateData(TypedDict, total=False):
 class ADocumentsService(AService, abc.ABC):
     @abc.abstractmethod
     async def admit(
-            self,
-            name: str,
-            *,
-            text_content: str | None = None,
-            file_bytes: bytes | None = None,
-            content_type: str | None = None,
-            original_filename: str | None = None,
-            metadata: Mapping[str, str] | None = None,
+        self,
+        name: str,
+        *,
+        text_content: str | None = None,
+        file_bytes: bytes | None = None,
+        content_type: str | None = None,
+        original_filename: str | None = None,
+        metadata: Mapping[str, str] | None = None,
     ) -> Document:
         raise NotImplementedError
 
@@ -118,13 +118,13 @@ class ADocumentsService(AService, abc.ABC):
 class DocumentsService(ADocumentsService):
     def __init__(
         self,
-            uow: AUnitOfWork,
-            segmenter: ATextSegmenter,
-            vectorizer: ATextVectorizer,
-            text_cleaner: ATextCleaner,
-            storage_client: AS3Client,
-            storage_bucket: str,
-            presigned_url_ttl: int,
+        uow: AUnitOfWork,
+        segmenter: ATextSegmenter,
+        vectorizer: ATextVectorizer,
+        text_cleaner: ATextCleaner,
+        storage_client: AS3Client,
+        storage_bucket: str,
+        presigned_url_ttl: int,
     ):
         self.uow = uow
         self.segmenter = segmenter
@@ -136,14 +136,14 @@ class DocumentsService(ADocumentsService):
         self._bucket_initialized = False
 
     async def admit(
-            self,
-            name: str,
-            *,
-            text_content: str | None = None,
-            file_bytes: bytes | None = None,
-            content_type: str | None = None,
-            original_filename: str | None = None,
-            metadata: Mapping[str, str] | None = None,
+        self,
+        name: str,
+        *,
+        text_content: str | None = None,
+        file_bytes: bytes | None = None,
+        content_type: str | None = None,
+        original_filename: str | None = None,
+        metadata: Mapping[str, str] | None = None,
     ) -> Document:
         if (text_content is None and file_bytes is None) or (text_content is not None and file_bytes is not None):
             raise BusinessLogicError("Provide either raw text or a document file for admission, not both.")
@@ -154,7 +154,8 @@ class DocumentsService(ADocumentsService):
         metadata_payload.setdefault("document_name", name)
 
         if file_bytes is None:
-            assert text_content is not None  # for type-checkers
+            if text_content is None:
+                raise ValueError("text_content must not be None when file_bytes is None")
             if not text_content.strip():
                 raise BusinessLogicError("Document content must not be empty.")
 

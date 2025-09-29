@@ -33,7 +33,7 @@ async def handle_document(
 
     try:
         async with semaphore:
-            document = await documents_service.admit(name=name, content=content)
+            document = await documents_service.admit(name=name, text_content=content)
         route = await routes_service.initialize(document_id=document.id, sender_id=sender_id)
     except Exception:
         await rmq.publish_message(FAILED_DOCUMENT_QUEUE, data, headers=headers)

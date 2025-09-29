@@ -1,7 +1,7 @@
 from app import infrastructure, service_layer
 from app.configs import Settings
 from app.container.keys import RedisCache
-from app.utils.cleaners import BasicDocumentCleaner, ATextCleaner
+from app.utils.cleaners import ATextCleaner, BasicDocumentCleaner
 
 
 class PostgresDatabaseWrapper(infrastructure.PostgresDatabase):
@@ -120,7 +120,7 @@ class S3MinioClientWrapper(infrastructure.S3MinioClient):
     def __init__(self, settings: Settings):
         s3 = settings.external.s3
         super().__init__(
-            endpoint_url=s3.endpoint_url,
+            endpoint_url=s3.endpoint_url,  # type: ignore[arg-type]
             region=s3.region,
             access_key=s3.access_key,
             secret_key=s3.secret_key,

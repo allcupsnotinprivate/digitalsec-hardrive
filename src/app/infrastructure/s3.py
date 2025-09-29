@@ -30,9 +30,7 @@ class AS3Client(AInfrastructure, abc.ABC):
         raise NotImplementedError
 
     @abc.abstractmethod
-    async def generate_presigned_url(
-        self, *, bucket: str, key: str, expires_in: int
-    ) -> str:
+    async def generate_presigned_url(self, *, bucket: str, key: str, expires_in: int) -> str:
         raise NotImplementedError
 
     @abc.abstractmethod
@@ -61,7 +59,7 @@ class S3MinioClient(AS3Client):
         if region:
             self._client_kwargs["region_name"] = region
 
-    def _client(self):
+    def _client(self) -> Any:
         return self._session.client("s3", **self._client_kwargs)
 
     async def ensure_bucket(self, bucket: str) -> None:
@@ -115,4 +113,4 @@ class S3MinioClient(AS3Client):
             metadata = result.get("Metadata", {})
             metadata["content_type"] = result.get("ContentType")
             metadata["content_length"] = result.get("ContentLength")
-            return metadata
+            return metadata  # type: ignore[no-any-return]

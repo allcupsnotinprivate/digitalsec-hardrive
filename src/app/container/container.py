@@ -11,14 +11,16 @@ from .keys import DocumentsSemaphore, InvestigationSemaphore, RedisCache
 from .wrappers import (
     AnalyticsServiceWrapper,
     BasicDocumentCleanerWrapper,
+    DocumentsServiceWrapper,
     PostgresDatabaseWrapper,
     RabbitMQWrapper,
     RedisClientWrapper,
     RetrieverServiceWrapper,
     RoutesServiceWrapper,
+    S3MinioClientWrapper,
     SemanticTextSegmenterWrapper,
     TextSummarizerWrapper,
-    TextVectorizerWrapper, S3MinioClientWrapper, DocumentsServiceWrapper,
+    TextVectorizerWrapper,
 )
 
 # Container & settings

@@ -4,10 +4,9 @@ from uuid import UUID
 
 from aioinject import Injected
 from aioinject.ext.fastapi import inject
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 
 from app.api.rest.schemas import PaginationParams, build_page_info
-from app.models import Document
 from app.service_layer import A_AgentsService, ADocumentsService, ARoutesService
 from app.service_layer.documents import ForwardedUpdateData
 from app.utils.hash import create_document_name
@@ -23,7 +22,6 @@ from .schemas import (
     DocumentChunkSearchResponse,
     DocumentForward,
     DocumentForwardsOut,
-    DocumentIn,
     DocumentOut,
     DocumentRead,
     DocumentSearchFilters,
@@ -91,7 +89,7 @@ async def admit_document(
     file: UploadFile | None = File(None),
     content: str | None = Form(None),
     name: str | None = Form(None),
-    documents_service: Injected[ADocumentsService] = Depends()
+    documents_service: Injected[ADocumentsService] = Depends(),
 ) -> DocumentOut:
     if file and content:
         raise HTTPException(400, "Provide either a file or plain text, not both.")
