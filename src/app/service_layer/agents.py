@@ -42,6 +42,8 @@ class A_AgentsService(AService, abc.ABC):
         description: str | None,
         is_active: bool | None,
         is_default_recipient: bool | None,
+        is_sender: bool | None = None,
+        is_recipient: bool | None = None,
     ) -> tuple[list[Agent], int]:
         raise NotImplementedError
 
@@ -108,6 +110,8 @@ class AgentsService(A_AgentsService):
         description: str | None,
         is_active: bool | None,
         is_default_recipient: bool | None,
+        is_sender: bool | None = None,
+        is_recipient: bool | None = None,
     ) -> tuple[list[Agent], int]:
         async with self.uow as uow_ctx:
             return await uow_ctx.agents.search(
@@ -118,4 +122,6 @@ class AgentsService(A_AgentsService):
                 description=description,
                 is_active=is_active,
                 is_default_recipient=is_default_recipient,
+                is_sender=is_sender,
+                is_recipient=is_recipient,
             )

@@ -2,7 +2,7 @@ import abc
 from typing import Any, Sequence
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import exists, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.sql.functions import func
 
@@ -37,6 +37,8 @@ class A_AgentsRepository(ARepository[Agent, UUID], abc.ABC):
         description: str | None,
         is_active: bool | None,
         is_default_recipient: bool | None,
+        is_sender: bool | None = None,
+        is_recipient: bool | None = None,
     ) -> tuple[list[Agent], int]:
         raise NotImplementedError
 
@@ -103,6 +105,8 @@ class AgentsRepository(A_AgentsRepository):
         description: str | None,
         is_active: bool | None,
         is_default_recipient: bool | None,
+        is_sender: bool | None = None,
+        is_recipient: bool | None = None,
     ) -> tuple[list[Agent], int]:
         filters: list[Any] = []
         if name:
@@ -115,6 +119,12 @@ class AgentsRepository(A_AgentsRepository):
             filters.append(self.model_class.id.in_(ids))
         if is_default_recipient is not None:
             filters.append(self.model_class.is_default_recipient.is_(is_default_recipient))
+        if is_sender is not None:
+            sender_exists = exists().where(Forwarded.sender_id == self.model_class.id)
+            filters.append(sender_exists if is_sender else sender_exists.not_())
+        if is_recipient is not None:
+            recipient_exists = exists().where(Forwarded.recipient_id == self.model_class.id)
+            filters.append(recipient_exists if is_recipient else recipient_exists.not_())
 
         count_stmt = select(func.count()).select_from(self.model_class).where(*filters)
         total_result = await self.session.execute(count_stmt)

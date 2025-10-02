@@ -78,6 +78,8 @@ class AgentSearchFilters(BaseAPISchema):
     description: str | None = Field(default=None)
     is_active: bool | None = Field(default=None)
     is_default_recipient: bool | None = Field(default=None)
+    is_sender: bool | None = Field(default=None)
+    is_recipient: bool | None = Field(default=None)
 
 
 class AgentRead(BaseAPISchema):

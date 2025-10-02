@@ -65,6 +65,8 @@ async def search_agents(
         description=filters.description,
         is_active=filters.is_active,
         is_default_recipient=filters.is_default_recipient,
+        is_sender=filters.is_sender,
+        is_recipient=filters.is_recipient,
     )
 
     return AgentSearchResponse(
